@@ -37,8 +37,7 @@ message PdfData {
   string document_id = 1;
   string file_name = 2;
   bytes content = 3;
-  uint64 content_size = 4;
-  bytes sha256 = 5;
+  bytes sha256 = 4;
 }
 
 message StrokeAdd {
@@ -68,6 +67,15 @@ message Redo {
 }
 
 message Error {
-  string code = 1;
+  ErrorCode code = 1;
   string message = 2;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_INVALID_PAYLOAD = 1;
+  ERROR_CODE_DOCUMENT_NOT_FOUND = 2;
+  ERROR_CODE_PAGE_OUT_OF_RANGE = 3;
+  ERROR_CODE_UNSUPPORTED_VERSION = 4;
+  ERROR_CODE_INTERNAL = 5;
 }
