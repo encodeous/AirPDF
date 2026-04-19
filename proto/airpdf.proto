@@ -37,6 +37,7 @@ message PdfData {
   string document_id = 1;
   string file_name = 2;
   bytes content = 3;
+  // Raw 32-byte SHA-256 digest of `content`.
   bytes sha256 = 4;
 }
 
@@ -44,7 +45,7 @@ message StrokeAdd {
   string document_id = 1;
   uint32 page_index = 2;
   string stroke_id = 3;
-  bytes pkstroke_data = 4; // Platform-native serialized PKStroke data.
+  bytes pk_stroke_data = 4; // Platform-native serialized PKStroke data.
 }
 
 message StrokeRemove {
