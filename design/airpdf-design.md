@@ -16,7 +16,7 @@ AirPDF aims to turn the iPad into a real-time, low-latency drawing tablet for ma
 We will utilize Apple's `Network` framework configured for the QUIC protocol. QUIC provides the perfect balance between the ultra-low latency of UDP and the reliability of TCP, avoiding head-of-line blocking while maintaining connection security and data integrity.
 *   **Mac (Host):** Runs an `NWListener` broadcasting the service or listening on a specific port.
 *   **iPad (Client):** Connects to the Mac's IP address manually via an `NWConnection`.
-*   **Messaging Protocol:** A custom binary or Codable-based framing protocol over QUIC streams to differentiate between command messages (e.g., "Load PDF", "Change Page") and data payloads (e.g., "New Stroke Data", "Undo"). Edit here: Use protobuf, and define a proto schema for the messages.
+*   **Messaging Protocol:** A protobuf-based framing protocol over QUIC streams to differentiate between command messages (e.g., "Load PDF", "Change Page") and data payloads (e.g., "New Stroke Data", "Undo"). Message schema is defined in `/proto/airpdf.proto`.
 
 ### 2. PDF Rendering Strategy: iPad Local Rendering
 To minimize bandwidth after the initial connection and provide the smoothest zooming/panning experience on the iPad:
@@ -77,4 +77,3 @@ This envelope structure ensures that future features (like `.textAnnotation` or 
 
 ## Migration & Rollback
 *   As this is a greenfield application, there is no legacy data to migrate.
-

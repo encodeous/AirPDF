@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package airpdf.v1;
+
+option go_package = "airpdf/proto;airpdfv1";
+
+// Top-level framed message exchanged between macOS and iPadOS peers.
+message SyncEnvelope {
+  // Milliseconds since Unix epoch.
+  int64 timestamp_ms = 1;
+  Payload payload = 2;
+}
+
+message Payload {
+  oneof body {
+    Ping ping = 1;
+    Pong pong = 2;
+    PdfData pdf_data = 3;
+    StrokeAdd stroke_add = 4;
+    StrokeRemove stroke_remove = 5;
+    PageTurn page_turn = 6;
+    Undo undo = 7;
+    Redo redo = 8;
+    Error error = 9;
+  }
+}
+
+message Ping {
+  uint64 sequence = 1;
+}
+
+message Pong {
+  uint64 sequence = 1;
+}
+
+message PdfData {
+  string document_id = 1;
+  string file_name = 2;
+  bytes content = 3;
+  uint64 content_size = 4;
+  bytes sha256 = 5;
+}
+
+message StrokeAdd {
+  string document_id = 1;
+  uint32 page_index = 2;
+  string stroke_id = 3;
+  bytes pkstroke_data = 4; // Platform-native serialized PKStroke data.
+}
+
+message StrokeRemove {
+  string document_id = 1;
+  uint32 page_index = 2;
+  string stroke_id = 3;
+}
+
+message PageTurn {
+  string document_id = 1;
+  uint32 page_index = 2;
+}
+
+message Undo {
+  string document_id = 1;
+}
+
+message Redo {
+  string document_id = 1;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+}
