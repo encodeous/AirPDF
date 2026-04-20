@@ -2,169 +2,266 @@ syntax = "proto3";
 
 package airpdf.v1;
 
-option go_package = "airpdf/proto;airpdfv1";
+// ═══════════════════════════════════════════════════════════════════════════════
+// AirPDF Wire Protocol
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Transport: Single bidirectional QUIC stream (Apple Network.framework).
+// Discovery: Bonjour service type "_airpdf._udp".
+// Framing: Each message on the wire is a length-prefixed SyncEnvelope.
+// Ordering: Strict FIFO — one stream guarantees no out-of-order delivery.
+// Session timeout: 1 minute of missed heartbeats triggers disconnect.
+// Single client: v1 supports exactly one connected iPad at a time.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // Top-level framed message exchanged between macOS and iPadOS peers.
+// Every message on the wire is exactly one SyncEnvelope.
 message SyncEnvelope {
-  // Milliseconds since Unix epoch.
+  // Milliseconds since Unix epoch. Used for latency diagnostics.
   int64 timestamp_ms = 1;
+
+  // The message payload (exactly one of the oneof variants).
   Payload payload = 2;
 }
 
 message Payload {
   oneof body {
-    Ping ping = 1;
-    Pong pong = 2;
+    // ── Handshake ───────────────────────────────────────────────────────────
     // iPad → Mac: sent immediately after the QUIC connection is established.
-    Hello hello = 3;
-    // Mac → iPad: reply to Hello.  Followed immediately by PdfData for every
+    Hello hello = 1;
+    // Mac → iPad: reply to Hello. Followed immediately by PdfData for every
     // currently-open document so the iPad can restore full session state.
-    Welcome welcome = 4;
+    Welcome welcome = 2;
+
+    // ── Connectivity ────────────────────────────────────────────────────────
+    // Bidirectional heartbeat. If no Pong is received within 1 minute, the
+    // sender tears down the connection.
+    Ping ping = 3;
+    Pong pong = 4;
+
+    // ── Document lifecycle ──────────────────────────────────────────────────
     // Mac → iPad: open or replace a document tab.
-    // `content` is always stripped of all ink annotations before sending so
-    // the iPad's PKCanvasView overlay is the sole renderer of strokes.
-    // `page_drawings` delivers the current per-page PKDrawing state in the same
-    // message, avoiding a separate round-trip after ink is removed from the PDF.
     PdfData pdf_data = 5;
-    // iPad → Mac: one or more finalized strokes added to the named document/page.
-    // Batched to reduce per-stroke framing overhead during fast writing.
-    StrokeBatch stroke_batch = 6;
-    // Bidirectional:
-    //   iPad → Mac  after a local undo, erase, or selection-delete.
-    //   Mac → iPad  to roll back a stroke the Mac rejected (e.g. out-of-sync state).
-    StrokeRemove stroke_remove = 7;
     // Mac → iPad: close and remove the named document tab.
-    PdfClose pdf_close = 8;
-    // iPad → Mac: the user triggered undo (pencil double-tap, keyboard shortcut,
-    //   or on-screen button).  The Mac is the sole source of truth for the undo
-    //   stack; the iPad button merely forwards the intent.  The Mac applies the
-    //   undo, then pushes the result back: StrokeRemove/StrokeBatch for stroke
-    //   changes, or a fresh PdfData if the undone action was non-stroke
-    //   (e.g. a text box or page insertion).  The iPad never manipulates its
-    //   PKCanvasView UndoManager independently for undo/redo.
+    PdfClose pdf_close = 6;
+
+    // ── Stroke synchronisation ──────────────────────────────────────────────
+    // iPad → Mac: one or more finalized strokes added to a document page.
+    StrokeBatch stroke_batch = 7;
+    // Bidirectional: stroke removal (erase, undo result, or selection-delete).
+    StrokeRemove stroke_remove = 8;
+
+    // ── Undo / Redo ─────────────────────────────────────────────────────────
+    // iPad → Mac: user triggered undo. Mac is sole undo/redo authority.
     Undo undo = 9;
-    // iPad → Mac: same as Undo but for redo.
+    // iPad → Mac: user triggered redo.
     Redo redo = 10;
+
+    // ── Errors ──────────────────────────────────────────────────────────────
+    // Bidirectional: signal a protocol or application error.
     Error error = 11;
   }
 }
 
-// ── Handshake ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Handshake
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// iPad → Mac on every new connection.
+// iPad → Mac on every new QUIC connection.
 message Hello {
   // Semantic version of the AirPDF wire protocol (e.g. "1.0.0").
-  // The Mac rejects incompatible versions with ERROR_CODE_UNSUPPORTED_VERSION.
+  // The Mac rejects incompatible versions with ERROR_CODE_UNSUPPORTED_VERSION
+  // followed by connection teardown.
   string protocol_version = 1;
+
   // Human-readable app build version for diagnostic logging (e.g. "0.1.0").
   string app_version = 2;
+
+  // Optional: session_id from a previous Welcome. When present, the iPad is
+  // requesting session resume after a reconnect (e.g. returning from background).
+  // The Mac honors this only if the session is still alive within the 1-minute
+  // timeout window; otherwise it issues a fresh session_id in Welcome.
+  string resume_session_id = 3;
 }
 
 // Mac → iPad reply to Hello.
 message Welcome {
-  // Protocol version the Mac will speak.  Must equal Hello.protocol_version;
-  // the iPad disconnects and surfaces an error if it differs.
+  // Protocol version the Mac will speak. Must match Hello.protocol_version.
   string protocol_version = 1;
-  // Opaque session identifier.  If the iPad reconnects and receives a
-  // different session_id it must discard all cached document state; the Mac
-  // will re-deliver PdfData for every open document immediately after Welcome.
+
+  // Opaque session identifier. If the iPad sent resume_session_id and receives
+  // a *different* session_id back, it must discard all cached document state;
+  // the Mac will re-deliver PdfData for every open document immediately after.
   string session_id = 2;
 }
 
-// ── Connectivity ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Connectivity / Heartbeat
+// ═══════════════════════════════════════════════════════════════════════════════
 
 message Ping {
+  // Monotonically increasing sequence number for RTT measurement.
   uint64 sequence = 1;
 }
 
 message Pong {
+  // Echoes the sequence from the corresponding Ping.
   uint64 sequence = 1;
 }
 
-// ── Document lifecycle ────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Document Lifecycle
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Mac → iPad
+// Mac → iPad: open a new document tab, or replace the state of an existing one.
+//
+// On initial open: the Mac strips all stroke outline annotations and
+// airpdf_drawing.pkdata attachments from the PDF, then sends the stripped bytes
+// as `content` alongside the per-page PKDrawing snapshots in `page_drawings`.
+//
+// On re-send (same document_id, e.g. after Mac adds a text box or new pages):
+// the iPad fully replaces its local PDF bytes, per-page drawings, and stroke
+// identity maps for this document. Any unsent local deltas are discarded.
+// If the page count changes, the iPad tears down all PKCanvasView instances
+// for this document and recreates them from the new page_drawings map.
 message PdfData {
-  // Stable UUID assigned by the Mac for the lifetime of the open document.
+  // Ephemeral UUID assigned by the Mac when the file is opened.
+  // Not derived from path or file content. Stable for the document's lifetime.
   string document_id = 1;
-  // Original filename shown in the iPad tab bar (e.g. "Lecture Notes.pdf").
+
+  // Original filename for display in the iPad tab bar (e.g. "Lecture Notes.pdf").
   string file_name = 2;
-  // Raw PDF bytes with ALL ink annotations stripped.  Stripping prevents the
-  // PDF renderer and the PKCanvasView overlay from both drawing the same strokes.
-  // Re-sending with the same document_id silently replaces the iPad's cached copy
-  // (used when the Mac adds text boxes, new pages, or other non-ink edits).
+
+  // Raw PDF bytes with ALL stroke outline annotations and airpdf_drawing.pkdata
+  // attachments stripped. This prevents the PDF renderer and the PKCanvasView
+  // overlay from both drawing the same strokes.
   bytes content = 3;
-  // Raw 32-byte SHA-256 digest of `content` for integrity checking on the iPad.
-  bytes sha256 = 4;
-  // Per-page PKDrawing snapshots keyed by 0-based page index (first page = 0).
-  // Value is PKDrawing.dataRepresentation() binary for that page.
-  // Pages absent from this map have no strokes; the iPad initializes them with
-  // an empty PKDrawing.  This field replaces what would otherwise require many
-  // individual StrokeBatch messages to reconstruct stroke state after open.
+
+  // SHA-256 digest of `content` for integrity verification on the iPad.
+  bytes content_sha256 = 4;
+
+  // Per-page PKDrawing snapshots. Key = 0-based page index, Value =
+  // PKDrawing.dataRepresentation() bytes. Pages absent from this map have no
+  // strokes; the iPad initializes them with an empty PKDrawing.
   map<uint32, bytes> page_drawings = 5;
-  // Total number of pages in the PDF.  Lets the iPad pre-allocate its per-page
-  // PKDrawing cache without parsing the PDF bytes first.
+
+  // Total number of pages in the PDF. Lets the iPad pre-allocate per-page
+  // canvas views without parsing the PDF bytes first.
   uint32 page_count = 6;
 }
 
-// Mac → iPad
+// Mac → iPad: close the document and remove its tab.
+// The iPad frees all associated PKDrawing state and canvas views.
 message PdfClose {
   string document_id = 1;
 }
 
-// ── Stroke synchronisation ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stroke Synchronisation
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// iPad → Mac: one or more finalized strokes to add.
+// iPad → Mac: one or more finalized strokes to add to a single page.
+// Batched to reduce per-stroke framing overhead during fast writing.
+//
+// After a PdfData state replacement, the iPad rebuilds its stroke_id cache by
+// assigning fresh UUIDs to each stroke in the new baseline (indexed by position)
+// and does NOT emit deltas for the replacement itself.
 message StrokeBatch {
   string document_id = 1;
+  // 0-based page index.
   uint32 page_index = 2;
+  // One or more new strokes.
   repeated StrokeEntry strokes = 3;
 }
 
+// A single finalized stroke.
 message StrokeEntry {
-  // UUID string assigned by the iPad.  Used for deduplication and as the key
-  // in subsequent StrokeRemove messages.
+  // UUID assigned by the iPad for deduplication and removal tracking.
   string stroke_id = 1;
-  // Serialized stroke data.  Because PKStroke has no public standalone
-  // serializer, this is PKDrawing.dataRepresentation() of a single-stroke
-  // PKDrawing (i.e. PKDrawing(strokes: [stroke]).dataRepresentation()).
+
+  // Serialized stroke. Because PKStroke has no public standalone serializer,
+  // this is PKDrawing.dataRepresentation() of a single-stroke PKDrawing wrapper:
+  //   PKDrawing(strokes: [stroke]).dataRepresentation()
   bytes pk_stroke_data = 2;
 }
 
-// Bidirectional — see Payload comments for per-direction semantics.
+// Bidirectional stroke removal.
+//   iPad → Mac: local erase or selection-delete.
+//   Mac → iPad: undo result, or authoritative state correction.
+//
+// Eraser semantics: if PencilKit splits a stroke due to partial erasure, the
+// fragments are new strokes (sent via StrokeBatch with new stroke_ids) and the
+// original stroke is removed via StrokeRemove.
 message StrokeRemove {
   string document_id = 1;
+  // 0-based page index.
   uint32 page_index = 2;
+  // The stroke_id to remove.
   string stroke_id = 3;
 }
 
-// ── Undo / Redo ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Undo / Redo
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// The Mac is the SOLE source of truth for the undo/redo stack. It covers all
+// actions in chronological order by arrival time (stroke batches from the iPad
+// and document edits on the Mac). The iPad never manages its own undo state.
+//
+// Flow:
+//   1. iPad sends Undo/Redo for a document.
+//   2. Mac applies the action:
+//      - If stroke-related: sends StrokeRemove (undo) or StrokeBatch (redo).
+//      - If non-stroke (text box, page insertion): re-sends PdfData with
+//        updated content and current page_drawings snapshot.
+//   3. iPad applies the received state change.
 
-// iPad → Mac: request to undo the last action on the given document.
-// The Mac is the sole undo/redo source of truth; see Payload comments.
+// iPad → Mac: request undo of the last action on the given document.
 message Undo {
   string document_id = 1;
 }
 
-// iPad → Mac: request to redo the last undone action on the given document.
+// iPad → Mac: request redo of the last undone action on the given document.
 message Redo {
   string document_id = 1;
 }
 
-// ── Errors ────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Errors
+// ═══════════════════════════════════════════════════════════════════════════════
 
 message Error {
   ErrorCode code = 1;
+  // Human-readable description for logging/debugging.
   string message = 2;
+  // Optional: the document_id this error relates to (empty if connection-level).
+  string document_id = 3;
 }
 
 enum ErrorCode {
   ERROR_CODE_UNSPECIFIED = 0;
+  // The received message could not be decoded or is structurally invalid.
   ERROR_CODE_INVALID_PAYLOAD = 1;
+  // A message referenced a document_id that is not currently open.
   ERROR_CODE_DOCUMENT_NOT_FOUND = 2;
+  // Hello.protocol_version is not supported. Connection will be torn down.
   ERROR_CODE_UNSUPPORTED_VERSION = 3;
+  // An unexpected internal error occurred.
   ERROR_CODE_INTERNAL = 4;
-  // Returned when a StrokeRemove references a stroke_id that is not present
-  // in the receiver's drawing for that page.
+  // A StrokeRemove referenced a stroke_id not present in the receiver's state.
   ERROR_CODE_STROKE_NOT_FOUND = 5;
+  // A second iPad attempted to connect while a client is already attached.
+  ERROR_CODE_CLIENT_ALREADY_CONNECTED = 6;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Constants (for reference — not wire types)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Bonjour service type:       "_airpdf._udp"
+// Session timeout:            60 seconds (1 minute)
+// Heartbeat interval:         ~10 seconds (implementation detail)
+// Max concurrent clients:     1
+// PKDrawing attachment name:  "airpdf_drawing.pkdata" (per-page file attachment)
+//
