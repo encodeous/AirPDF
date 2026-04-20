@@ -15,19 +15,60 @@ message Payload {
   oneof body {
     Ping ping = 1;
     Pong pong = 2;
-    // Mac → iPad: open or replace a document tab (re-send with same document_id to push updates).
-    PdfData pdf_data = 3;
-    // iPad → Mac: new stroke on the named document.
-    StrokeAdd stroke_add = 4;
-    // iPad → Mac: stroke removed on the named document.
-    StrokeRemove stroke_remove = 5;
-    // Mac → iPad: close the named document tab.
-    PdfClose pdf_close = 6;
-    Undo undo = 7;
-    Redo redo = 8;
-    Error error = 9;
+    // iPad → Mac: sent immediately after the QUIC connection is established.
+    Hello hello = 3;
+    // Mac → iPad: reply to Hello.  Followed immediately by PdfData for every
+    // currently-open document so the iPad can restore full session state.
+    Welcome welcome = 4;
+    // Mac → iPad: open or replace a document tab.
+    // `content` is always stripped of all ink annotations before sending so
+    // the iPad's PKCanvasView overlay is the sole renderer of strokes.
+    // `page_drawings` delivers the current per-page PKDrawing state in the same
+    // message, avoiding a separate round-trip after ink is removed from the PDF.
+    PdfData pdf_data = 5;
+    // iPad → Mac: one or more finalized strokes added to the named document/page.
+    // Batched to reduce per-stroke framing overhead during fast writing.
+    StrokeBatch stroke_batch = 6;
+    // Bidirectional:
+    //   iPad → Mac  after a local undo, erase, or selection-delete.
+    //   Mac → iPad  to roll back a stroke the Mac rejected (e.g. out-of-sync state).
+    StrokeRemove stroke_remove = 7;
+    // Mac → iPad: close and remove the named document tab.
+    PdfClose pdf_close = 8;
+    // Mac → iPad: ask the iPad to invoke PencilKit's undo manager for the given
+    // page.  The iPad fires the request, then the resulting PKDrawing diff
+    // propagates back as a StrokeRemove (or StrokeBatch for a redo-style undo).
+    Undo undo = 9;
+    // Mac → iPad: ask the iPad to invoke PencilKit's redo manager for the given
+    // page.  The resulting diff propagates back as a StrokeBatch.
+    Redo redo = 10;
+    Error error = 11;
   }
 }
+
+// ── Handshake ─────────────────────────────────────────────────────────────────
+
+// iPad → Mac on every new connection.
+message Hello {
+  // Semantic version of the AirPDF wire protocol (e.g. "1.0.0").
+  // The Mac rejects incompatible versions with ERROR_CODE_UNSUPPORTED_VERSION.
+  string protocol_version = 1;
+  // Human-readable app build version for diagnostic logging (e.g. "0.1.0").
+  string app_version = 2;
+}
+
+// Mac → iPad reply to Hello.
+message Welcome {
+  // Protocol version the Mac will speak.  Must equal Hello.protocol_version;
+  // the iPad disconnects and surfaces an error if it differs.
+  string protocol_version = 1;
+  // Opaque session identifier.  If the iPad reconnects and receives a
+  // different session_id it must discard all cached document state; the Mac
+  // will re-deliver PdfData for every open document immediately after Welcome.
+  string session_id = 2;
+}
+
+// ── Connectivity ──────────────────────────────────────────────────────────────
 
 message Ping {
   uint64 sequence = 1;
@@ -37,39 +78,80 @@ message Pong {
   uint64 sequence = 1;
 }
 
+// ── Document lifecycle ────────────────────────────────────────────────────────
+
+// Mac → iPad
 message PdfData {
+  // Stable UUID assigned by the Mac for the lifetime of the open document.
   string document_id = 1;
+  // Original filename shown in the iPad tab bar (e.g. "Lecture Notes.pdf").
   string file_name = 2;
+  // Raw PDF bytes with ALL ink annotations stripped.  Stripping prevents the
+  // PDF renderer and the PKCanvasView overlay from both drawing the same strokes.
+  // Re-sending with the same document_id silently replaces the iPad's cached copy
+  // (used when the Mac adds text boxes, new pages, or other non-ink edits).
   bytes content = 3;
-  // Raw 32-byte SHA-256 digest of `content`.
+  // Raw 32-byte SHA-256 digest of `content` for integrity checking on the iPad.
   bytes sha256 = 4;
+  // Per-page PKDrawing snapshots keyed by 0-based page index (first page = 0).
+  // Value is PKDrawing.dataRepresentation() binary for that page.
+  // Pages absent from this map have no strokes; the iPad initializes them with
+  // an empty PKDrawing.  This field replaces what would otherwise require many
+  // individual StrokeBatch messages to reconstruct stroke state after open.
+  map<uint32, bytes> page_drawings = 5;
+  // Total number of pages in the PDF.  Lets the iPad pre-allocate its per-page
+  // PKDrawing cache without parsing the PDF bytes first.
+  uint32 page_count = 6;
 }
 
-// Sent by the Mac to close and remove the corresponding tab on the iPad.
+// Mac → iPad
 message PdfClose {
   string document_id = 1;
 }
 
-message StrokeAdd {
+// ── Stroke synchronisation ────────────────────────────────────────────────────
+
+// iPad → Mac: one or more finalized strokes to add.
+message StrokeBatch {
   string document_id = 1;
   uint32 page_index = 2;
-  string stroke_id = 3;
-  bytes pk_stroke_data = 4; // Platform-native serialized PKStroke data.
+  repeated StrokeEntry strokes = 3;
 }
 
+message StrokeEntry {
+  // UUID string assigned by the iPad.  Used for deduplication and as the key
+  // in subsequent StrokeRemove messages.
+  string stroke_id = 1;
+  // Serialized stroke data.  Because PKStroke has no public standalone
+  // serializer, this is PKDrawing.dataRepresentation() of a single-stroke
+  // PKDrawing (i.e. PKDrawing(strokes: [stroke]).dataRepresentation()).
+  bytes pk_stroke_data = 2;
+}
+
+// Bidirectional — see Payload comments for per-direction semantics.
 message StrokeRemove {
   string document_id = 1;
   uint32 page_index = 2;
   string stroke_id = 3;
 }
 
+// ── Undo / Redo ───────────────────────────────────────────────────────────────
+
+// Mac → iPad
 message Undo {
   string document_id = 1;
+  // 0-based index of the page whose PKCanvasView undo manager should be invoked.
+  uint32 page_index = 2;
 }
 
+// Mac → iPad
 message Redo {
   string document_id = 1;
+  // 0-based index of the page whose PKCanvasView redo manager should be invoked.
+  uint32 page_index = 2;
 }
+
+// ── Errors ────────────────────────────────────────────────────────────────────
 
 message Error {
   ErrorCode code = 1;
@@ -82,4 +164,7 @@ enum ErrorCode {
   ERROR_CODE_DOCUMENT_NOT_FOUND = 2;
   ERROR_CODE_UNSUPPORTED_VERSION = 3;
   ERROR_CODE_INTERNAL = 4;
+  // Returned when a StrokeRemove references a stroke_id that is not present
+  // in the receiver's drawing for that page.
+  ERROR_CODE_STROKE_NOT_FOUND = 5;
 }
