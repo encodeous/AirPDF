@@ -35,12 +35,20 @@ message Payload {
     StrokeRemove stroke_remove = 7;
     // Mac → iPad: close and remove the named document tab.
     PdfClose pdf_close = 8;
-    // Mac → iPad: ask the iPad to invoke PencilKit's undo manager for the given
-    // page.  The iPad fires the request, then the resulting PKDrawing diff
-    // propagates back as a StrokeRemove (or StrokeBatch for a redo-style undo).
+    // Bidirectional — global document-level undo.
+    //   iPad → Mac: the iPad user triggered undo on their stroke canvas (e.g.
+    //     pencil double-tap or keyboard shortcut).  The stroke diff already
+    //     propagates naturally via StrokeRemove; this message tells the Mac to
+    //     pop its global undo stack in sync.  If the top of the Mac's stack is
+    //     a non-stroke action (e.g. a text box the Mac added), the Mac applies
+    //     the undo locally and re-sends PdfData with the updated document state.
+    //   Mac → iPad: the Mac user triggered undo whose top action is a stroke.
+    //     The iPad invokes its PKCanvasView UndoManager; the resulting
+    //     PKDrawing diff propagates back as StrokeRemove.  If the top action
+    //     is non-stroke, the Mac handles it locally and re-sends PdfData
+    //     without sending Undo to the iPad.
     Undo undo = 9;
-    // Mac → iPad: ask the iPad to invoke PencilKit's redo manager for the given
-    // page.  The resulting diff propagates back as a StrokeBatch.
+    // Same as Undo but for redo.
     Redo redo = 10;
     Error error = 11;
   }
@@ -137,18 +145,17 @@ message StrokeRemove {
 
 // ── Undo / Redo ───────────────────────────────────────────────────────────────
 
-// Mac → iPad
+// Bidirectional — see Payload comments for per-direction semantics.
+// No page_index: undo/redo is a document-global operation.  The receiving
+// side applies it to whichever local undo manager is appropriate
+// (PKCanvasView's UndoManager on the iPad; the document UndoManager on the Mac).
 message Undo {
   string document_id = 1;
-  // 0-based index of the page whose PKCanvasView undo manager should be invoked.
-  uint32 page_index = 2;
 }
 
-// Mac → iPad
+// Bidirectional — see Payload comments for per-direction semantics.
 message Redo {
   string document_id = 1;
-  // 0-based index of the page whose PKCanvasView redo manager should be invoked.
-  uint32 page_index = 2;
 }
 
 // ── Errors ────────────────────────────────────────────────────────────────────
