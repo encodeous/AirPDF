@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import os
 
 final class QuicServer {
     enum State: Equatable {
@@ -18,6 +19,8 @@ final class QuicServer {
 
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "dev.airpdf.mac.quic-server")
+    private let logger = Logger(subsystem: "dev.airpdf.mac", category: "quic-server")
+    private let maxReceiveLength = 64 * 1024
 
     func start(port: UInt16) throws {
         guard listener == nil else { return }
@@ -53,9 +56,9 @@ final class QuicServer {
     }
 
     private func configure(connection: NWConnection) {
-        connection.stateUpdateHandler = { state in
+        connection.stateUpdateHandler = { [logger] state in
             if case let .failed(error) = state {
-                print("Connection failed: \(error)")
+                logger.error("Connection failed: \(String(describing: error))")
             }
         }
         connection.start(queue: queue)
@@ -63,7 +66,7 @@ final class QuicServer {
     }
 
     private func receive(on connection: NWConnection) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { _, _, isComplete, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: maxReceiveLength) { _, _, isComplete, error in
             if error == nil && !isComplete {
                 self.receive(on: connection)
             } else {
