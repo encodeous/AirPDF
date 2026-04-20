@@ -35,15 +35,7 @@ To optimize network traffic and simplify conflict resolution, the synchronizatio
 *   **Reconstruction:** The Mac receives the stroke data, deserializes it, and appends it to its own internal `PKDrawing` model, updating its display synchronously.
 
 ### Data Structures & Extensibility
-The payload format over the network will be designed generically:
-```swift
-struct SyncEnvelope: Codable {
-    let type: PayloadType // .pdfData, .pdfClose, .strokeAdd, .strokeRemove
-    let data: Data
-    let timestamp: TimeInterval
-}
-```
-This envelope structure ensures that future features (like `.textAnnotation` or `.layerState`) can be added without fundamentally rewriting the networking layer.
+All messages are framed as a `SyncEnvelope` protobuf message (timestamp + `Payload` oneof). The `Payload` oneof currently covers `PdfData`, `PdfClose`, `StrokeAdd`, `StrokeRemove`, `Undo`, `Redo`, `Ping`, `Pong`, and `Error`. See `/proto/airpdf.proto` for the canonical schema. This structure ensures that future features (like `.textAnnotation` or `.layerState`) can be added as new oneof variants without rewriting the networking layer.
 
 ## Alternatives Considered
 *   **Custom UDP Networking:** Rejected in favor of QUIC. While UDP offers the absolute lowest theoretical latency, it requires a massive development effort to manually implement packet ordering, retransmissions for critical data (like stroke data), and security. QUIC provides these automatically with negligible latency overhead.
