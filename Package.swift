@@ -5,7 +5,7 @@ var products: [Product] = []
 var targets: [Target] = [
     .target(
         name: "AirPDFCore",
-        path: "Sources/AirPDFCore"
+        path: "Sources/Core"
     ),
     .testTarget(
         name: "AirPDFCoreTests",
@@ -17,7 +17,7 @@ var targets: [Target] = [
 #if os(macOS)
 products.append(
     .executable(
-        name: "AirPDFMacApp",
+        name: "AirPDF",
         targets: ["AirPDFMacApp"]
     )
 )
@@ -25,7 +25,7 @@ targets.append(
     .executableTarget(
         name: "AirPDFMacApp",
         dependencies: ["AirPDFCore"],
-        path: "Sources/AirPDFMacApp"
+        path: "Sources/macOS"
     )
 )
 #endif

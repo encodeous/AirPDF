@@ -2,7 +2,7 @@ import Foundation
 import Network
 import os
 
-final class QuicServer {
+final class QuicServer: @unchecked Sendable {
     private static let defaultMaxReceiveBufferSize = 64 * 1024
 
     enum Error: Swift.Error {
