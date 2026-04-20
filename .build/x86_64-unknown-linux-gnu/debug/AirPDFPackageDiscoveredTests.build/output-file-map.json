@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/primary.swiftdeps"
+  },
+  "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/AirPDFCoreTests.swift": {
+    "dependencies": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests.d",
+    "object": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests.swift.o",
+    "swiftmodule": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests~partial.swiftmodule",
+    "swift-dependencies": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests.swiftdeps",
+    "diagnostics": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests.dia"
+  },
+  "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/all-discovered-tests.swift": {
+    "dependencies": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests.d",
+    "object": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests.swift.o",
+    "swiftmodule": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests~partial.swiftmodule",
+    "swift-dependencies": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests.swiftdeps",
+    "diagnostics": "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests.dia"
+  }
+}

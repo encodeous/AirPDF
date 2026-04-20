@@ -1,0 +1,738 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.xctest",
+      "packagePath" : "/home/runner/work/AirPDF/AirPDF",
+      "productName" : "AirPDFPackageTests"
+    }
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+    "AirPDFPackageDiscoveredTests"
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.AirPDFCore-x86_64-unknown-linux-gnu-debug.module" : {
+      "executable" : "/usr/share/swift/usr/bin/swiftc",
+      "fileList" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/sources",
+      "importPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSessionStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/swift-version--1BFCD5C06E9F820A.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "AirPDFCore",
+      "moduleOutputPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFCore.swiftmodule",
+      "objects" : [
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/DocumentSession.swift.o",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/DocumentSessionStore.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-unknown-linux-gnu",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j2",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/include/AirPDFCore-Swift.h",
+        "-color-diagnostics",
+        "-swift-version",
+        "6",
+        "-g",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "airpdf",
+        "-Xcc",
+        "-fno-omit-frame-pointer"
+      ],
+      "outputFileMapPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/DocumentSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/DocumentSessionStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFCore.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSession.swift",
+        "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSessionStore.swift"
+      ],
+      "tempsPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.AirPDFCoreTests-x86_64-unknown-linux-gnu-debug.module" : {
+      "executable" : "/usr/share/swift/usr/bin/swiftc",
+      "fileList" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/sources",
+      "importPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/Tests/AirPDFCoreTests/DocumentSessionStoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/swift-version--1BFCD5C06E9F820A.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFCore.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "AirPDFCoreTests",
+      "moduleOutputPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFCoreTests.swiftmodule",
+      "objects" : [
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/DocumentSessionStoreTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-unknown-linux-gnu",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j2",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-color-diagnostics",
+        "-swift-version",
+        "6",
+        "-g",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "airpdf",
+        "-Xcc",
+        "-fno-omit-frame-pointer"
+      ],
+      "outputFileMapPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/DocumentSessionStoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFCoreTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/home/runner/work/AirPDF/AirPDF/Tests/AirPDFCoreTests/DocumentSessionStoreTests.swift"
+      ],
+      "tempsPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.AirPDFPackageDiscoveredTests-x86_64-unknown-linux-gnu-debug.module" : {
+      "executable" : "/usr/share/swift/usr/bin/swiftc",
+      "fileList" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/sources",
+      "importPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/AirPDFCoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/all-discovered-tests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/swift-version--1BFCD5C06E9F820A.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFCoreTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "AirPDFPackageDiscoveredTests",
+      "moduleOutputPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFPackageDiscoveredTests.swiftmodule",
+      "objects" : [
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests.swift.o",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-unknown-linux-gnu",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j2",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/include/AirPDFPackageDiscoveredTests-Swift.h",
+        "-color-diagnostics",
+        "-g",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "airpdf",
+        "-Xcc",
+        "-fno-omit-frame-pointer"
+      ],
+      "outputFileMapPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFPackageDiscoveredTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/AirPDFCoreTests.swift",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/all-discovered-tests.swift"
+      ],
+      "tempsPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.AirPDFPackageTests-x86_64-unknown-linux-gnu-debug.module" : {
+      "executable" : "/usr/share/swift/usr/bin/swiftc",
+      "fileList" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/sources",
+      "importPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/swift-version--1BFCD5C06E9F820A.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFCoreTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFPackageDiscoveredTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "AirPDFPackageTests",
+      "moduleOutputPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFPackageTests.swiftmodule",
+      "objects" : [
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-unknown-linux-gnu",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j2",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/include/AirPDFPackageTests-Swift.h",
+        "-color-diagnostics",
+        "-g",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "airpdf",
+        "-Xcc",
+        "-fno-omit-frame-pointer"
+      ],
+      "outputFileMapPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "AirPDFCore" : [
+      "/usr/share/swift/usr/bin/swiftc",
+      "-module-name",
+      "AirPDFCore",
+      "-package-name",
+      "airpdf",
+      "-c",
+      "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSession.swift",
+      "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSessionStore.swift",
+      "-I",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "-target",
+      "x86_64-unknown-linux-gnu",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j2",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/include/AirPDFCore-Swift.h",
+      "-color-diagnostics",
+      "-swift-version",
+      "6",
+      "-g",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "airpdf",
+      "-Xcc",
+      "-fno-omit-frame-pointer",
+      "-driver-use-frontend-path",
+      "/usr/share/swift/usr/bin/swiftc"
+    ],
+    "AirPDFCoreTests" : [
+      "/usr/share/swift/usr/bin/swiftc",
+      "-module-name",
+      "AirPDFCoreTests",
+      "-package-name",
+      "airpdf",
+      "-c",
+      "/home/runner/work/AirPDF/AirPDF/Tests/AirPDFCoreTests/DocumentSessionStoreTests.swift",
+      "-I",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "-target",
+      "x86_64-unknown-linux-gnu",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j2",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-color-diagnostics",
+      "-swift-version",
+      "6",
+      "-g",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "airpdf",
+      "-Xcc",
+      "-fno-omit-frame-pointer",
+      "-driver-use-frontend-path",
+      "/usr/share/swift/usr/bin/swiftc"
+    ],
+    "AirPDFPackageDiscoveredTests" : [
+      "/usr/share/swift/usr/bin/swiftc",
+      "-module-name",
+      "AirPDFPackageDiscoveredTests",
+      "-package-name",
+      "airpdf",
+      "-c",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/AirPDFCoreTests.swift",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/all-discovered-tests.swift",
+      "-I",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "-target",
+      "x86_64-unknown-linux-gnu",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j2",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/include/AirPDFPackageDiscoveredTests-Swift.h",
+      "-color-diagnostics",
+      "-g",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "airpdf",
+      "-Xcc",
+      "-fno-omit-frame-pointer",
+      "-driver-use-frontend-path",
+      "/usr/share/swift/usr/bin/swiftc"
+    ],
+    "AirPDFPackageTests" : [
+      "/usr/share/swift/usr/bin/swiftc",
+      "-module-name",
+      "AirPDFPackageTests",
+      "-package-name",
+      "airpdf",
+      "-c",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.derived/runner.swift",
+      "-I",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules",
+      "-target",
+      "x86_64-unknown-linux-gnu",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j2",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/include/AirPDFPackageTests-Swift.h",
+      "-color-diagnostics",
+      "-g",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "airpdf",
+      "-Xcc",
+      "-fno-omit-frame-pointer",
+      "-driver-use-frontend-path",
+      "/usr/share/swift/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "AirPDFCore" : [
+
+    ],
+    "AirPDFCoreTests" : [
+      "AirPDFCore"
+    ],
+    "AirPDFPackageDiscoveredTests" : [
+      "AirPDFCoreTests",
+      "AirPDFCore"
+    ],
+    "AirPDFPackageTests" : [
+      "AirPDFPackageDiscoveredTests",
+      "AirPDFCoreTests",
+      "AirPDFCore"
+    ]
+  },
+  "testDiscoveryCommands" : {
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/all-discovered-tests.swift" : {
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/DocumentSessionStoreTests.swift.o"
+        }
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/AirPDFCoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/all-discovered-tests.swift"
+        }
+      ]
+    }
+  },
+  "testEntryPointCommands" : {
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.derived/runner.swift" : {
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/Modules/AirPDFPackageDiscoveredTests.swiftmodule"
+        }
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/Sources/AirPDFCore/DocumentSessionStore.swift"
+        }
+      ],
+      "outputFilePath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/sources"
+    },
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/Tests/AirPDFCoreTests/DocumentSessionStoreTests.swift"
+        }
+      ],
+      "outputFilePath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/sources"
+    },
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/AirPDFCoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.derived/all-discovered-tests.swift"
+        }
+      ],
+      "outputFilePath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/sources"
+    },
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/sources"
+    },
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/AirPDFCore.swiftmodule.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/DocumentSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCore.build/DocumentSessionStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/AirPDFCoreTests.swiftmodule.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFCoreTests.build/DocumentSessionStoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFCoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/AirPDFPackageDiscoveredTests.swiftmodule.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageDiscoveredTests.build/all-discovered-tests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/AirPDFPackageTests.swiftmodule.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.build/runner.swift.o"
+        }
+      ],
+      "outputFilePath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/AirPDFPackageTests.product/Objects.LinkFileList"
+    },
+    "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/swift-version--1BFCD5C06E9F820A.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/usr/share/swift/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/home/runner/work/AirPDF/AirPDF/.build/x86_64-unknown-linux-gnu/debug/swift-version--1BFCD5C06E9F820A.txt"
+    }
+  }
+}
