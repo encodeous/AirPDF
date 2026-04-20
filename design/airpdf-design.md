@@ -27,7 +27,35 @@ To minimize bandwidth after the initial connection and provide the smoothest zoo
 *   The PencilKit `PKCanvasView` will be overlaid transparently on top of the PDF view in each tab.
 *   Page navigation, scroll position, and zoom level are **not** synchronized — each device scrolls and navigates independently.
 
-### 3. Drawing Synchronization: Finalized Strokes
+### 3. Stroke Persistence: Editable Handwriting inside the PDF
+AirPDF must be able to save a marked-up PDF, close it, reopen it, and continue editing the handwriting — without flattening the strokes into pixels.
+
+#### How other apps approach this
+| App | Editable after save? | Mechanism |
+|---|---|---|
+| Apple Preview / Markup | ✅ | Standard PDF `/Ink` annotations (ISO 32000 §12.5.6.13) |
+| PDF Expert / Acrobat | ✅ | Same standard PDF `/Ink` annotations |
+| GoodNotes 5/6 | ❌ in PDF export | Proprietary `.goodnotes` zip; PDF export flattens to raster |
+| Notability | ❌ in PDF export | Proprietary `.note` format; PDF export flattens |
+| Xournal++ | ✅ in `.xopp` only | XML container; PDF export flattens |
+
+#### Chosen approach: dual-layer storage inside the PDF
+AirPDF uses a **dual-layer strategy** — everything lives inside the `.pdf` file itself; no sidecar files are needed.
+
+**Layer 1 — Visual (standard PDF ink annotation):**
+Each page that has strokes gets exactly one `PDFAnnotation` of subtype `.ink` (using `PDFKit`'s `PDFAnnotationSubtype.ink`). The annotation stores simplified polyline paths (`inkList`) derived from the `PKDrawing` for that page. Any PDF viewer (Preview, Acrobat, PDF Expert, iOS Files) can render these paths without knowing anything about AirPDF.
+
+**Layer 2 — Data (custom annotation key `AirPDFStrokeData`):**
+The same annotation carries a custom dictionary key `/AirPDFStrokeData` whose value is the Base64-encoded binary output of `PKDrawing.dataRepresentation()` for that page. `PDFAnnotation` exposes `setValue(_:forAnnotationKey:)` which writes arbitrary entries into the annotation's PDF dictionary; conforming PDF viewers that do not understand the key silently ignore it. When AirPDF reopens the file it reads this key and calls `PKDrawing(data:)` to restore full PencilKit fidelity — pressure, tilt, velocity, tool type, and color all survive the round-trip.
+
+This is the same strategy used by OneNote (rich private data embedded alongside a standards-compliant rendering), expressed entirely within standard PDF annotation dictionary entries.
+
+#### Persistence lifecycle (Mac only — iPad never writes to disk)
+*   **On save:** for each page, serialize its `PKDrawing` → Base64 → set `/AirPDFStrokeData` on the page's `.ink` annotation; update the annotation's `inkList` paths for visual compatibility; call `PDFDocument.write(to:)`.
+*   **On open:** for each `.ink` annotation, attempt to read `/AirPDFStrokeData` → `PKDrawing(data:)` → load into `PKCanvasView` overlay with full fidelity. If the key is absent (file annotated by a third-party app), fall back to constructing a `PKDrawing` from the standard ink paths (lower fidelity, but still editable).
+*   **Stroke updates from iPad** are merged into the in-memory `PKDrawing` and flushed to disk on the next explicit save.
+
+### 4. Drawing Synchronization: Finalized Strokes
 To optimize network traffic and simplify conflict resolution, the synchronization will operate at the finalized stroke level.
 *   **Capture:** The iPad app listens to `PKCanvasViewDelegate`'s `canvasViewDrawingDidChange(_:)`.
 *   **Diffing:** The app maintains a cache of previously known strokes. Upon a change, it identifies the delta (new or removed strokes).
@@ -54,10 +82,12 @@ All messages are framed as a `SyncEnvelope` protobuf message (timestamp + `Paylo
 3.  iPad: Receive `PdfData` payloads, display each document in its own tab using `PDFView` (PDFKit); replace the cached PDF silently on re-send; close the tab on `PdfClose`.
 
 ### Phase 3: PencilKit & Drawing Sync
-1.  iPad: Overlay a transparent `PKCanvasView` on the PDF.
+1.  iPad: Overlay a transparent `PKCanvasView` on the PDF in each tab.
 2.  iPad: Implement stroke diffing logic in `canvasViewDrawingDidChange`.
 3.  iPad: Serialize and transmit new/removed strokes.
-4.  Mac: Receive stroke data, deserialize, and render on the Mac's corresponding PDF view.
+4.  Mac: Receive stroke data, deserialize, and merge into the in-memory `PKDrawing` for the correct document and page; render on the Mac's corresponding PDF view.
+5.  Mac: On document open, read the `/AirPDFStrokeData` custom key from each page's `.ink` annotation and hydrate the per-page `PKDrawing`; fall back to standard ink paths if the key is absent.
+6.  Mac: On document save, serialize each page's `PKDrawing` into `/AirPDFStrokeData` and update the `inkList` visual paths, then write the PDF.
 
 ### Phase 4: Refinement & Optimization
 1.  Profile latency using Instruments and optimize data serialization.
@@ -69,6 +99,7 @@ All messages are framed as a `SyncEnvelope` protobuf message (timestamp + `Paylo
 *   **Network Resiliency:** Use Network Link Conditioner to simulate high packet loss and high latency. Verify that QUIC correctly recovers without dropping strokes or deadlocking.
 *   **Memory Profiling:** Ensure the iPad does not leak memory when repeatedly opening and closing large PDFs.
 *   **Fidelity:** Verify that stroke thickness, color, and opacity render identically on both macOS and iPadOS.
+*   **Persistence Round-trip:** Save a marked-up PDF, reopen it in AirPDF, and verify that all strokes are fully editable (pressure, tool type, etc. preserved). Also open the saved file in Apple Preview and PDF Expert to confirm the standard ink annotation visual layer renders correctly.
 
 ## Migration & Rollback
 *   As this is a greenfield application, there is no legacy data to migrate.
