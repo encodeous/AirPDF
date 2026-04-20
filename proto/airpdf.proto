@@ -35,20 +35,15 @@ message Payload {
     StrokeRemove stroke_remove = 7;
     // Mac → iPad: close and remove the named document tab.
     PdfClose pdf_close = 8;
-    // Bidirectional — global document-level undo.
-    //   iPad → Mac: the iPad user triggered undo on their stroke canvas (e.g.
-    //     pencil double-tap or keyboard shortcut).  The stroke diff already
-    //     propagates naturally via StrokeRemove; this message tells the Mac to
-    //     pop its global undo stack in sync.  If the top of the Mac's stack is
-    //     a non-stroke action (e.g. a text box the Mac added), the Mac applies
-    //     the undo locally and re-sends PdfData with the updated document state.
-    //   Mac → iPad: the Mac user triggered undo whose top action is a stroke.
-    //     The iPad invokes its PKCanvasView UndoManager; the resulting
-    //     PKDrawing diff propagates back as StrokeRemove.  If the top action
-    //     is non-stroke, the Mac handles it locally and re-sends PdfData
-    //     without sending Undo to the iPad.
+    // iPad → Mac: the user triggered undo (pencil double-tap, keyboard shortcut,
+    //   or on-screen button).  The Mac is the sole source of truth for the undo
+    //   stack; the iPad button merely forwards the intent.  The Mac applies the
+    //   undo, then pushes the result back: StrokeRemove/StrokeBatch for stroke
+    //   changes, or a fresh PdfData if the undone action was non-stroke
+    //   (e.g. a text box or page insertion).  The iPad never manipulates its
+    //   PKCanvasView UndoManager independently for undo/redo.
     Undo undo = 9;
-    // Same as Undo but for redo.
+    // iPad → Mac: same as Undo but for redo.
     Redo redo = 10;
     Error error = 11;
   }
@@ -145,15 +140,13 @@ message StrokeRemove {
 
 // ── Undo / Redo ───────────────────────────────────────────────────────────────
 
-// Bidirectional — see Payload comments for per-direction semantics.
-// No page_index: undo/redo is a document-global operation.  The receiving
-// side applies it to whichever local undo manager is appropriate
-// (PKCanvasView's UndoManager on the iPad; the document UndoManager on the Mac).
+// iPad → Mac: request to undo the last action on the given document.
+// The Mac is the sole undo/redo source of truth; see Payload comments.
 message Undo {
   string document_id = 1;
 }
 
-// Bidirectional — see Payload comments for per-direction semantics.
+// iPad → Mac: request to redo the last undone action on the given document.
 message Redo {
   string document_id = 1;
 }
