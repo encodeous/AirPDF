@@ -4,6 +4,8 @@ import PDFKit
 
 @MainActor
 final class AppModel: ObservableObject {
+    private static let defaultServerPort: UInt16 = 9443
+
     @Published private(set) var sessions: [DocumentSession] = []
     @Published private(set) var serverState: QuicServer.State = .stopped
     @Published var selectedSessionID: UUID?
@@ -56,7 +58,7 @@ final class AppModel: ObservableObject {
         self.selectedSessionID = sessions.last?.id
     }
 
-    func startServer(port: UInt16 = 9443) {
+    func startServer(port: UInt16 = defaultServerPort) {
         do {
             try quicServer.start(port: port)
         } catch {

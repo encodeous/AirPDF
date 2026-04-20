@@ -3,6 +3,8 @@ import Network
 import os
 
 final class QuicServer {
+    private static let defaultMaxReceiveBufferSize = 64 * 1024
+
     enum Error: Swift.Error {
         case invalidPort(UInt16)
     }
@@ -24,7 +26,7 @@ final class QuicServer {
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "dev.airpdf.mac.quic-server")
     private let logger = Logger(subsystem: "dev.airpdf.mac", category: "quic-server")
-    private let maxReceiveLength = 64 * 1024
+    private let maxReceiveLength = QuicServer.defaultMaxReceiveBufferSize
 
     func start(port: UInt16) throws {
         guard listener == nil else { return }
