@@ -60,6 +60,7 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let urls):
+                appModel.lastError = nil
                 urls.forEach(appModel.openPDF(at:))
             case .failure(let error):
                 appModel.lastError = error.localizedDescription

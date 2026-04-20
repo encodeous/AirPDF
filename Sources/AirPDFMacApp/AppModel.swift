@@ -21,10 +21,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func openPDF(at url: URL) {
+    @discardableResult
+    func openPDF(at url: URL) -> Bool {
         guard let document = PDFDocument(url: url) else {
-            lastError = "Unable to open \(url.lastPathComponent)."
-            return
+            if lastError == nil {
+                lastError = "Unable to open \(url.lastPathComponent)."
+            }
+            return false
         }
 
         let session = DocumentSession(
@@ -35,6 +38,7 @@ final class AppModel: ObservableObject {
         store.upsert(session)
         sessions = store.sessions
         selectedSessionID = session.id
+        return true
     }
 
     func closeSelectedPDF() {

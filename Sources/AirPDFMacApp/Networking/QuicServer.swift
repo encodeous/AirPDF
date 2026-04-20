@@ -66,7 +66,11 @@ final class QuicServer {
     }
 
     private func receive(on connection: NWConnection) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: maxReceiveLength) { [weak self, logger] _, _, isComplete, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: maxReceiveLength) { [weak self, logger] data, _, isComplete, error in
+            if let data, !data.isEmpty {
+                logger.debug("Received \(data.count) bytes")
+            }
+
             if let error {
                 logger.error("Receive failed: \(String(describing: error))")
             }
