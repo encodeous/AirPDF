@@ -24,9 +24,7 @@ final class AppModel: ObservableObject {
     @discardableResult
     func openPDF(at url: URL) -> Bool {
         guard let document = PDFDocument(url: url) else {
-            if lastError == nil {
-                lastError = "Unable to open \(url.lastPathComponent)."
-            }
+            lastError = "Unable to open \(url.lastPathComponent)."
             return false
         }
 
@@ -39,6 +37,16 @@ final class AppModel: ObservableObject {
         sessions = store.sessions
         selectedSessionID = session.id
         return true
+    }
+
+    func openPDFs(at urls: [URL]) {
+        var firstError: String?
+        for url in urls {
+            if !openPDF(at: url), firstError == nil {
+                firstError = lastError
+            }
+        }
+        lastError = firstError
     }
 
     func closeSelectedPDF() {

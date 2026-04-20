@@ -3,6 +3,10 @@ import Network
 import os
 
 final class QuicServer {
+    enum Error: Swift.Error {
+        case invalidPort(UInt16)
+    }
+
     enum State: Equatable {
         case stopped
         case running
@@ -29,7 +33,9 @@ final class QuicServer {
         let parameters = NWParameters(quic: options)
         parameters.allowLocalEndpointReuse = true
 
-        let nwPort = NWEndpoint.Port(rawValue: port) ?? .any
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+            throw Error.invalidPort(port)
+        }
         let listener = try NWListener(using: parameters, on: nwPort)
         listener.newConnectionHandler = { [weak self] connection in
             self?.configure(connection: connection)
