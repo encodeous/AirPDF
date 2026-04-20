@@ -15,10 +15,14 @@ message Payload {
   oneof body {
     Ping ping = 1;
     Pong pong = 2;
+    // Mac → iPad: open or replace a document tab (re-send with same document_id to push updates).
     PdfData pdf_data = 3;
+    // iPad → Mac: new stroke on the named document.
     StrokeAdd stroke_add = 4;
+    // iPad → Mac: stroke removed on the named document.
     StrokeRemove stroke_remove = 5;
-    PageTurn page_turn = 6;
+    // Mac → iPad: close the named document tab.
+    PdfClose pdf_close = 6;
     Undo undo = 7;
     Redo redo = 8;
     Error error = 9;
@@ -41,6 +45,11 @@ message PdfData {
   bytes sha256 = 4;
 }
 
+// Sent by the Mac to close and remove the corresponding tab on the iPad.
+message PdfClose {
+  string document_id = 1;
+}
+
 message StrokeAdd {
   string document_id = 1;
   uint32 page_index = 2;
@@ -52,11 +61,6 @@ message StrokeRemove {
   string document_id = 1;
   uint32 page_index = 2;
   string stroke_id = 3;
-}
-
-message PageTurn {
-  string document_id = 1;
-  uint32 page_index = 2;
 }
 
 message Undo {
@@ -76,7 +80,6 @@ enum ErrorCode {
   ERROR_CODE_UNSPECIFIED = 0;
   ERROR_CODE_INVALID_PAYLOAD = 1;
   ERROR_CODE_DOCUMENT_NOT_FOUND = 2;
-  ERROR_CODE_PAGE_OUT_OF_RANGE = 3;
-  ERROR_CODE_UNSUPPORTED_VERSION = 4;
-  ERROR_CODE_INTERNAL = 5;
+  ERROR_CODE_UNSUPPORTED_VERSION = 3;
+  ERROR_CODE_INTERNAL = 4;
 }
