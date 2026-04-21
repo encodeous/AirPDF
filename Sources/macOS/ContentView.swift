@@ -1,5 +1,6 @@
 #if os(macOS)
 import SwiftUI
+import Combine
 import UniformTypeIdentifiers
 
 struct MacContentView: View {
@@ -38,6 +39,42 @@ struct MacContentView: View {
             }
             .toolbar {
                 ToolbarItem { Button("Open") { showImporter = true } }
+                ToolbarItem {
+                    Button("Save") { appModel.saveSelectedPDF() }
+                        .disabled(appModel.selectedSessionID == nil)
+                }
+                ToolbarItem {
+                    Button("Undo") {
+                        if let id = appModel.selectedSessionID,
+                           let s = appModel.sessions.first(where: { $0.id == id }) {
+                            s.undoManager.undo()
+                            appModel.objectWillChange.send()
+                        }
+                    }
+                    .keyboardShortcut("z", modifiers: .command)
+                    .disabled({
+                        guard let id = appModel.selectedSessionID,
+                              let s = appModel.sessions.first(where: { $0.id == id })
+                        else { return true }
+                        return !s.undoManager.canUndo
+                    }())
+                }
+                ToolbarItem {
+                    Button("Redo") {
+                        if let id = appModel.selectedSessionID,
+                           let s = appModel.sessions.first(where: { $0.id == id }) {
+                            s.undoManager.redo()
+                            appModel.objectWillChange.send()
+                        }
+                    }
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    .disabled({
+                        guard let id = appModel.selectedSessionID,
+                              let s = appModel.sessions.first(where: { $0.id == id })
+                        else { return true }
+                        return !s.undoManager.canRedo
+                    }())
+                }
             }
         } detail: {
             detailView

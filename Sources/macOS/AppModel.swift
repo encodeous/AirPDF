@@ -2,6 +2,7 @@
 import Foundation
 import Combine
 import PDFKit
+import PencilKit
 import CryptoKit
 import SwiftUI
 
@@ -120,7 +121,102 @@ final class AppModel: ObservableObject {
     }
 
     private func handleMessage(_ envelope: Airpdf_V1_SyncEnvelope) {
-        // Phase 3+ will handle StrokeBatch, Undo, Redo, etc.
+        switch envelope.payload.body {
+        case .strokeBatch(let msg):
+            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
+            let pageIdx = Int(msg.pageIndex)
+            let prevStrokes = currentStrokes(session: session, page: pageIdx)
+            let prevMeta = session.strokeMetadata[pageIdx] ?? [:]
+            var strokes = prevStrokes
+            var addedIds: [String] = []
+            for entry in msg.strokes {
+                guard let drawing = try? PKDrawing(data: entry.pkStrokeData),
+                      let stroke = drawing.strokes.first else { continue }
+                strokes.append(stroke)
+                session.strokeMetadata[pageIdx, default: [:]][entry.strokeID] = stroke
+                addedIds.append(entry.strokeID)
+            }
+            updateDrawing(session: session, page: pageIdx, strokes: strokes)
+            // Register undo
+            session.undoManager.registerUndo(withTarget: self) { [weak self] target in
+                guard let self else { return }
+                addedIds.forEach { session.strokeMetadata[pageIdx]?.removeValue(forKey: $0) }
+                self.updateDrawing(session: session, page: pageIdx, strokes: prevStrokes)
+                // Send StrokeRemove to iPad for each undone stroke
+                for sid in addedIds {
+                    var remove = Airpdf_V1_StrokeRemove()
+                    remove.documentID = msg.documentID
+                    remove.pageIndex = msg.pageIndex
+                    remove.strokeID = sid
+                    self.activeClient?.send(.wrap(.strokeRemove(remove)))
+                }
+                self.objectWillChange.send()
+            }
+            objectWillChange.send()
+
+        case .strokeRemove(let msg):
+            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
+            let pageIdx = Int(msg.pageIndex)
+            session.strokeMetadata[pageIdx]?.removeValue(forKey: msg.strokeID)
+            let remaining = Array((session.strokeMetadata[pageIdx] ?? [:]).values)
+            updateDrawing(session: session, page: pageIdx, strokes: remaining)
+            objectWillChange.send()
+
+        case .undo(let msg):
+            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
+            session.undoManager.undo()
+            objectWillChange.send()
+
+        case .redo(let msg):
+            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
+            session.undoManager.redo()
+            objectWillChange.send()
+
+        default: break
+        }
+    }
+
+    private func currentStrokes(session: DocumentSession, page: Int) -> [PKStroke] {
+        guard let data = session.pageDrawings[page],
+              let drawing = try? PKDrawing(data: data) else { return [] }
+        return drawing.strokes
+    }
+
+    private func updateDrawing(session: DocumentSession, page: Int, strokes: [PKStroke]) {
+        let drawing = PKDrawing(strokes: strokes)
+        session.pageDrawings[page] = (try? drawing.dataRepresentation()) ?? Data()
+        // Render strokes as ink annotations on the PDFPage for Mac display
+        guard let pdfPage = session.pdfDocument.page(at: page) else { return }
+        // Remove existing AirPDF ink annotations
+        pdfPage.annotations.filter { $0.type == "Ink" }.forEach { pdfPage.removeAnnotation($0) }
+        // Add one ink annotation per stroke
+        for stroke in strokes {
+            let ann = PKStroke.toPDFInkAnnotation(stroke, page: pdfPage)
+            pdfPage.addAnnotation(ann)
+        }
+    }
+
+    // MARK: - Save
+
+    func saveSelectedPDF() {
+        guard let id = selectedSessionID,
+              let session = sessions.first(where: { $0.id == id }) else { return }
+        // Attach pkdata per page
+        for (pageIdx, drawingData) in session.pageDrawings {
+            guard let page = session.pdfDocument.page(at: pageIdx) else { continue }
+            // Remove old pkdata attachment
+            page.annotations
+                .filter { $0.type == "FileAttachment" && $0.contents == "airpdf_drawing.pkdata" }
+                .forEach { page.removeAnnotation($0) }
+            // Add new pkdata attachment
+            let ann = PDFAnnotation(bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                                    forType: PDFAnnotationSubtype(rawValue: "/FileAttachment"),
+                                    withProperties: nil)
+            ann.contents = "airpdf_drawing.pkdata"
+            ann.setValue(drawingData, forAnnotationKey: PDFAnnotationKey(rawValue: "/FS"))
+            page.addAnnotation(ann)
+        }
+        session.pdfDocument.write(to: session.fileURL)
     }
 }
 #endif

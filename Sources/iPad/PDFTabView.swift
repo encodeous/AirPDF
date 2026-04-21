@@ -4,6 +4,7 @@ import PDFKit
 
 struct PDFTabView: View {
     @ObservedObject var store: DocumentStore
+    let onStrokeDelta: (Airpdf_V1_SyncEnvelope) -> Void
     @State private var selectedId: String?
 
     var body: some View {
@@ -29,7 +30,7 @@ struct PDFTabView: View {
                     Divider()
                 }
                 if let doc = docs.first(where: { $0.id == sel }) ?? docs.first {
-                    iPadPDFView(data: doc.pdfData)
+                    PDFCanvasView(doc: doc, onStrokeDelta: onStrokeDelta)
                         .id(doc.id)
                 }
             }
@@ -40,19 +41,5 @@ struct PDFTabView: View {
             }
         }
     }
-}
-
-private struct iPadPDFView: UIViewRepresentable {
-    let data: Data
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.document = PDFDocument(data: data)
-        return view
-    }
-
-    func updateUIView(_ uiView: PDFView, context: Context) {}
 }
 #endif

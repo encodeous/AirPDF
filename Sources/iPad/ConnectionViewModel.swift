@@ -30,6 +30,22 @@ final class ConnectionViewModel: ObservableObject {
         client.connect(to: endpoint)
     }
 
+    func send(_ envelope: Airpdf_V1_SyncEnvelope) {
+        client.send(envelope)
+    }
+
+    func sendUndoRedo(undo: Bool) {
+        // Send for the currently visible document (first in store for now)
+        guard let docId = documentStore.documents.first?.id else { return }
+        if undo {
+            var msg = Airpdf_V1_Undo(); msg.documentID = docId
+            client.send(.wrap(.undo(msg)))
+        } else {
+            var msg = Airpdf_V1_Redo(); msg.documentID = docId
+            client.send(.wrap(.redo(msg)))
+        }
+    }
+
     func disconnect() {
         client.disconnect()
         documentStore.closeAll()

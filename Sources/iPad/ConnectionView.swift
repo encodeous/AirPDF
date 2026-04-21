@@ -31,7 +31,9 @@ private struct ClientStateView: View {
                         .buttonStyle(.bordered)
                 }
             case .connected:
-                PDFTabView(store: vm.documentStore)
+                PDFTabView(store: vm.documentStore, onStrokeDelta: { vm.send($0) })
+                    .navigationTitle("")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             VStack(alignment: .leading, spacing: 1) {
@@ -41,7 +43,11 @@ private struct ClientStateView: View {
                             .font(.caption2).monospaced().foregroundStyle(.secondary)
                         }
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Disconnect", role: .destructive) { vm.disconnect() }
+                            HStack {
+                                Button("Undo") { vm.sendUndoRedo(undo: true) }
+                                Button("Redo") { vm.sendUndoRedo(undo: false) }
+                                Button("Disconnect", role: .destructive) { vm.disconnect() }
+                            }
                         }
                     }
             }

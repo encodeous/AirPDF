@@ -1,6 +1,7 @@
 #if os(macOS)
 import Foundation
 import PDFKit
+import PencilKit
 
 final class DocumentSession: Identifiable, @unchecked Sendable {
     let id: UUID           // local SwiftUI identity
@@ -9,7 +10,9 @@ final class DocumentSession: Identifiable, @unchecked Sendable {
     let fileURL: URL
     let pageCount: Int
     let pdfDocument: PDFDocument
-    var pageDrawings: [Int: Data] // page index → PKDrawing.dataRepresentation()
+    var pageDrawings: [Int: Data]       // page index → PKDrawing.dataRepresentation()
+    var strokeMetadata: [Int: [String: PKStroke]] = [:] // page → strokeId → PKStroke
+    let undoManager = UndoManager()
 
     init(fileName: String, fileURL: URL, pdfDocument: PDFDocument) {
         self.id = UUID()
@@ -18,7 +21,18 @@ final class DocumentSession: Identifiable, @unchecked Sendable {
         self.fileURL = fileURL
         self.pageCount = pdfDocument.pageCount
         self.pdfDocument = pdfDocument
-        self.pageDrawings = [:]
+        var drawings: [Int: Data] = [:]
+        for i in 0..<pdfDocument.pageCount {
+            guard let page = pdfDocument.page(at: i) else { continue }
+            for ann in page.annotations {
+                guard ann.type == "FileAttachment",
+                      ann.contents == "airpdf_drawing.pkdata",
+                      let data = ann.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/FS")) as? Data
+                else { continue }
+                drawings[i] = data
+            }
+        }
+        self.pageDrawings = drawings
     }
 }
 
