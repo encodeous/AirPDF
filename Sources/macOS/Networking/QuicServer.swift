@@ -1,94 +1,123 @@
+#if os(macOS)
 import Foundation
+import Combine
 import Network
 import os
 
-final class QuicServer: @unchecked Sendable {
-    private static let defaultMaxReceiveBufferSize = 64 * 1024
-
-    enum Error: Swift.Error {
-        case invalidPort(UInt16)
-    }
-
+/// Manages the QUIC server: TLS identity, single-client enforcement, Bonjour advertisement,
+/// Hello/Welcome handshake, heartbeat, and session timeout.
+@MainActor
+final class QuicServer: ObservableObject {
     enum State: Equatable {
         case stopped
-        case running
-
-        var label: String {
-            switch self {
-            case .stopped: "Stopped"
-            case .running: "Running"
-            }
-        }
+        case running(port: UInt16)
+        case clientConnected(sessionId: String)
     }
 
-    var onStateChange: ((State) -> Void)?
+    @Published private(set) var state: State = .stopped
 
     private var listener: NWListener?
-    private let queue = DispatchQueue(label: "dev.airpdf.mac.quic-server")
-    private let logger = Logger(subsystem: "dev.airpdf.mac", category: "quic-server")
-    private let maxReceiveLength = QuicServer.defaultMaxReceiveBufferSize
+    private var activeClient: ClientConnection?
+    private var bonjourService: NWListener?
+    private let queue = DispatchQueue(label: "dev.airpdf.mac.quic", qos: .userInitiated)
+    private let logger = Logger(subsystem: "dev.airpdf.mac", category: "QuicServer")
 
-    func start(port: UInt16) throws {
-        guard listener == nil else { return }
+    // Injected by AppModel so the server can push PdfData on reconnect
+    var onClientConnected: ((ClientConnection) -> Void)?
+    var onClientDisconnected: (() -> Void)?
 
-        let options = NWProtocolQUIC.Options()
-        let parameters = NWParameters(quic: options)
-        parameters.allowLocalEndpointReuse = true
+    func start() throws {
+        guard state == .stopped else { return }
 
-        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
-            throw Error.invalidPort(port)
+        let tlsOptions = NWProtocolTLS.Options()
+        let identity = try TLSIdentity.selfSigned()
+        sec_protocol_options_set_local_identity(
+            tlsOptions.securityProtocolOptions,
+            identity.secIdentity
+        )
+        sec_protocol_options_set_min_tls_protocol_version(
+            tlsOptions.securityProtocolOptions,
+            .TLSv12
+        )
+
+        let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
+        quicOptions.direction = .bidirectional
+
+        let params = NWParameters(quic: quicOptions)
+        params.allowLocalEndpointReuse = true
+
+        let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: AirPDFConstants.serverPort)!)
+        self.listener = listener
+
+        listener.newConnectionHandler = { [weak self] conn in
+            Task { @MainActor in self?.handleIncoming(conn) }
         }
-        let listener = try NWListener(using: parameters, on: nwPort)
-        listener.newConnectionHandler = { [weak self] connection in
-            self?.configure(connection: connection)
-        }
-        listener.stateUpdateHandler = { [weak self] state in
-            switch state {
-            case .ready:
-                self?.onStateChange?(.running)
-            case .failed, .cancelled:
-                self?.onStateChange?(.stopped)
-            default:
-                break
+        listener.stateUpdateHandler = { [weak self] s in
+            guard let self else { return }
+            Task { @MainActor in
+                switch s {
+                case .ready:
+                    self.state = .running(port: AirPDFConstants.serverPort)
+                    self.logger.info("QUIC server ready on port \(AirPDFConstants.serverPort)")
+                case .failed(let err):
+                    self.logger.error("Listener failed: \(err)")
+                    self.state = .stopped
+                case .cancelled:
+                    self.state = .stopped
+                default: break
+                }
             }
         }
-
-        self.listener = listener
         listener.start(queue: queue)
+        advertiseBonjour()
     }
 
     func stop() {
+        activeClient?.cancel()
+        activeClient = nil
         listener?.cancel()
         listener = nil
-        onStateChange?(.stopped)
+        bonjourService?.cancel()
+        bonjourService = nil
+        state = .stopped
     }
 
-    private func configure(connection: NWConnection) {
-        connection.stateUpdateHandler = { [logger] state in
-            if case let .failed(error) = state {
-                logger.error("Connection failed: \(String(describing: error))")
+    // MARK: - Incoming connection
+
+    private func handleIncoming(_ conn: NWConnection) {
+        if activeClient != nil {
+            // Single-client enforcement: reject immediately
+            let client = ClientConnection(connection: conn, queue: queue)
+            client.sendError(.clientAlreadyConnected, message: "A client is already connected.")
+            client.cancel()
+            logger.warning("Rejected second client connection")
+            return
+        }
+        let client = ClientConnection(connection: conn, queue: queue)
+        activeClient = client
+        client.onDisconnect = { [weak self] in
+            Task { @MainActor in
+                self?.activeClient = nil
+                self?.state = .running(port: AirPDFConstants.serverPort)
+                self?.onClientDisconnected?()
             }
         }
-        connection.start(queue: queue)
-        receive(on: connection)
+        client.onSessionEstablished = { [weak self] sessionId in
+            Task { @MainActor in
+                self?.state = .clientConnected(sessionId: sessionId)
+                self?.onClientConnected?(client)
+            }
+        }
+        client.start()
     }
 
-    private func receive(on connection: NWConnection) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: maxReceiveLength) { [weak self, logger] data, _, isComplete, error in
-            if let data, !data.isEmpty {
-                logger.debug("Received \(data.count) bytes")
-            }
+    // MARK: - Bonjour
 
-            if let error {
-                logger.error("Receive failed: \(String(describing: error))")
-            }
-
-            if error == nil && !isComplete {
-                self?.receive(on: connection)
-                return
-            }
-
-            connection.cancel()
-        }
+    private func advertiseBonjour() {
+        listener?.service = NWListener.Service(
+            name: Host.current().localizedName ?? "AirPDF Mac",
+            type: AirPDFConstants.bonjourServiceType
+        )
     }
 }
+#endif

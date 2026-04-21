@@ -1,0 +1,850 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A380B0C22F96F47100FB766D /* TLSIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B72F96F47100FB766D /* TLSIdentity.swift */; };
+		A380B0C32F96F47100FB766D /* AirPDFConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AA2F96F47100FB766D /* AirPDFConstants.swift */; };
+		A380B0C42F96F47100FB766D /* BonjourBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AF2F96F47100FB766D /* BonjourBrowser.swift */; };
+		A380B0C52F96F47100FB766D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BC2F96F47100FB766D /* ContentView.swift */; };
+		A380B0C72F96F47100FB766D /* QuicServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B62F96F47100FB766D /* QuicServer.swift */; };
+		A380B0C82F96F47100FB766D /* FrameCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AB2F96F47100FB766D /* FrameCodec.swift */; };
+		A380B0C92F96F47100FB766D /* AirPDFMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B92F96F47100FB766D /* AirPDFMacApp.swift */; };
+		A380B0CA2F96F47100FB766D /* SyncEnvelope+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AD2F96F47100FB766D /* SyncEnvelope+Helpers.swift */; };
+		A380B0CB2F96F47100FB766D /* DocumentSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BE2F96F47100FB766D /* DocumentSessionStore.swift */; };
+		A380B0CC2F96F47100FB766D /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BB2F96F47100FB766D /* AppModel.swift */; };
+		A380B0CE2F96F47100FB766D /* DocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BD2F96F47100FB766D /* DocumentSession.swift */; };
+		A380B0CF2F96F47100FB766D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BA2F96F47100FB766D /* AppDelegate.swift */; };
+		A380B0D02F96F47100FB766D /* ClientConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B52F96F47100FB766D /* ClientConnection.swift */; };
+		A380B0D12F96F47100FB766D /* ConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B32F96F47100FB766D /* ConnectionViewModel.swift */; };
+		A380B0D22F96F47100FB766D /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B22F96F47100FB766D /* ConnectionView.swift */; };
+		A380B0D32F96F47100FB766D /* QuicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B02F96F47100FB766D /* QuicClient.swift */; };
+		A380B0D52F96F47100FB766D /* TLSIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B72F96F47100FB766D /* TLSIdentity.swift */; };
+		A380B0D62F96F47100FB766D /* AirPDFConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AA2F96F47100FB766D /* AirPDFConstants.swift */; };
+		A380B0D72F96F47100FB766D /* BonjourBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AF2F96F47100FB766D /* BonjourBrowser.swift */; };
+		A380B0D82F96F47100FB766D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BC2F96F47100FB766D /* ContentView.swift */; };
+		A380B0DA2F96F47100FB766D /* QuicServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B62F96F47100FB766D /* QuicServer.swift */; };
+		A380B0DB2F96F47100FB766D /* FrameCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AB2F96F47100FB766D /* FrameCodec.swift */; };
+		A380B0DC2F96F47100FB766D /* AirPDFMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B92F96F47100FB766D /* AirPDFMacApp.swift */; };
+		A380B0DD2F96F47100FB766D /* SyncEnvelope+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AD2F96F47100FB766D /* SyncEnvelope+Helpers.swift */; };
+		A380B0DE2F96F47100FB766D /* DocumentSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BE2F96F47100FB766D /* DocumentSessionStore.swift */; };
+		A380B0DF2F96F47100FB766D /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BB2F96F47100FB766D /* AppModel.swift */; };
+		A380B0E12F96F47100FB766D /* DocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BD2F96F47100FB766D /* DocumentSession.swift */; };
+		A380B0E22F96F47100FB766D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BA2F96F47100FB766D /* AppDelegate.swift */; };
+		A380B0E32F96F47100FB766D /* ClientConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B52F96F47100FB766D /* ClientConnection.swift */; };
+		A380B0E42F96F47100FB766D /* ConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B32F96F47100FB766D /* ConnectionViewModel.swift */; };
+		A380B0E52F96F47100FB766D /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B22F96F47100FB766D /* ConnectionView.swift */; };
+		A380B0E62F96F47100FB766D /* QuicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B02F96F47100FB766D /* QuicClient.swift */; };
+		A380B0E72F96F47100FB766D /* TLSIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B72F96F47100FB766D /* TLSIdentity.swift */; };
+		A380B0E82F96F47100FB766D /* AirPDFConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AA2F96F47100FB766D /* AirPDFConstants.swift */; };
+		A380B0E92F96F47100FB766D /* BonjourBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AF2F96F47100FB766D /* BonjourBrowser.swift */; };
+		A380B0EA2F96F47100FB766D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BC2F96F47100FB766D /* ContentView.swift */; };
+		A380B0EC2F96F47100FB766D /* QuicServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B62F96F47100FB766D /* QuicServer.swift */; };
+		A380B0ED2F96F47100FB766D /* FrameCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AB2F96F47100FB766D /* FrameCodec.swift */; };
+		A380B0EE2F96F47100FB766D /* AirPDFMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B92F96F47100FB766D /* AirPDFMacApp.swift */; };
+		A380B0EF2F96F47100FB766D /* SyncEnvelope+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0AD2F96F47100FB766D /* SyncEnvelope+Helpers.swift */; };
+		A380B0F02F96F47100FB766D /* DocumentSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BE2F96F47100FB766D /* DocumentSessionStore.swift */; };
+		A380B0F12F96F47100FB766D /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BB2F96F47100FB766D /* AppModel.swift */; };
+		A380B0F32F96F47100FB766D /* DocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BD2F96F47100FB766D /* DocumentSession.swift */; };
+		A380B0F42F96F47100FB766D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0BA2F96F47100FB766D /* AppDelegate.swift */; };
+		A380B0F52F96F47100FB766D /* ClientConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B52F96F47100FB766D /* ClientConnection.swift */; };
+		A380B0F62F96F47100FB766D /* ConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B32F96F47100FB766D /* ConnectionViewModel.swift */; };
+		A380B0F72F96F47100FB766D /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B22F96F47100FB766D /* ConnectionView.swift */; };
+		A380B0F82F96F47100FB766D /* QuicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B0B02F96F47100FB766D /* QuicClient.swift */; };
+		A380B1092F96F73400FB766D /* airpdf.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B1072F96F73400FB766D /* airpdf.pb.swift */; };
+		A380B10A2F96F73400FB766D /* airpdf.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B1072F96F73400FB766D /* airpdf.pb.swift */; };
+		A380B10B2F96F73400FB766D /* airpdf.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B1072F96F73400FB766D /* airpdf.pb.swift */; };
+		A380B10E2F96F8A500FB766D /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = A380B10D2F96F8A500FB766D /* SwiftProtobuf */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A380B0562F96F21C00FB766D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A380B0402F96F21A00FB766D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A380B0472F96F21A00FB766D;
+			remoteInfo = AirPDF;
+		};
+		A380B0602F96F21C00FB766D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A380B0402F96F21A00FB766D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A380B0472F96F21A00FB766D;
+			remoteInfo = AirPDF;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A380B0482F96F21A00FB766D /* AirPDF.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirPDF.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A380B0552F96F21C00FB766D /* AirPDFTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AirPDFTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A380B05F2F96F21C00FB766D /* AirPDFUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AirPDFUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A380B0AA2F96F47100FB766D /* AirPDFConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPDFConstants.swift; sourceTree = "<group>"; };
+		A380B0AB2F96F47100FB766D /* FrameCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameCodec.swift; sourceTree = "<group>"; };
+		A380B0AD2F96F47100FB766D /* SyncEnvelope+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SyncEnvelope+Helpers.swift"; sourceTree = "<group>"; };
+		A380B0AF2F96F47100FB766D /* BonjourBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourBrowser.swift; sourceTree = "<group>"; };
+		A380B0B02F96F47100FB766D /* QuicClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuicClient.swift; sourceTree = "<group>"; };
+		A380B0B22F96F47100FB766D /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
+		A380B0B32F96F47100FB766D /* ConnectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionViewModel.swift; sourceTree = "<group>"; };
+		A380B0B52F96F47100FB766D /* ClientConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientConnection.swift; sourceTree = "<group>"; };
+		A380B0B62F96F47100FB766D /* QuicServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuicServer.swift; sourceTree = "<group>"; };
+		A380B0B72F96F47100FB766D /* TLSIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TLSIdentity.swift; sourceTree = "<group>"; };
+		A380B0B92F96F47100FB766D /* AirPDFMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPDFMacApp.swift; sourceTree = "<group>"; };
+		A380B0BA2F96F47100FB766D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A380B0BB2F96F47100FB766D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A380B0BC2F96F47100FB766D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A380B0BD2F96F47100FB766D /* DocumentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSession.swift; sourceTree = "<group>"; };
+		A380B0BE2F96F47100FB766D /* DocumentSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSessionStore.swift; sourceTree = "<group>"; };
+		A380B1072F96F73400FB766D /* airpdf.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = airpdf.pb.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A380B04A2F96F21A00FB766D /* AirPDF */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AirPDF;
+			sourceTree = "<group>";
+		};
+		A380B0582F96F21C00FB766D /* AirPDFTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AirPDFTests;
+			sourceTree = "<group>";
+		};
+		A380B0622F96F21C00FB766D /* AirPDFUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AirPDFUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A380B0452F96F21A00FB766D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A380B10E2F96F8A500FB766D /* SwiftProtobuf in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A380B0522F96F21C00FB766D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A380B05C2F96F21C00FB766D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A380B03F2F96F21A00FB766D = {
+			isa = PBXGroup;
+			children = (
+				A380B0C02F96F47100FB766D /* Sources */,
+				A380B04A2F96F21A00FB766D /* AirPDF */,
+				A380B0582F96F21C00FB766D /* AirPDFTests */,
+				A380B0622F96F21C00FB766D /* AirPDFUITests */,
+				A380B10C2F96F8A500FB766D /* Frameworks */,
+				A380B0492F96F21A00FB766D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A380B0492F96F21A00FB766D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A380B0482F96F21A00FB766D /* AirPDF.app */,
+				A380B0552F96F21C00FB766D /* AirPDFTests.xctest */,
+				A380B05F2F96F21C00FB766D /* AirPDFUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A380B0AE2F96F47100FB766D /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A380B0AA2F96F47100FB766D /* AirPDFConstants.swift */,
+				A380B0AB2F96F47100FB766D /* FrameCodec.swift */,
+				A380B0AD2F96F47100FB766D /* SyncEnvelope+Helpers.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A380B0B12F96F47100FB766D /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				A380B0AF2F96F47100FB766D /* BonjourBrowser.swift */,
+				A380B0B02F96F47100FB766D /* QuicClient.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		A380B0B42F96F47100FB766D /* iPad */ = {
+			isa = PBXGroup;
+			children = (
+				A380B0B12F96F47100FB766D /* Networking */,
+				A380B0B22F96F47100FB766D /* ConnectionView.swift */,
+				A380B0B32F96F47100FB766D /* ConnectionViewModel.swift */,
+			);
+			path = iPad;
+			sourceTree = "<group>";
+		};
+		A380B0B82F96F47100FB766D /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				A380B0B52F96F47100FB766D /* ClientConnection.swift */,
+				A380B0B62F96F47100FB766D /* QuicServer.swift */,
+				A380B0B72F96F47100FB766D /* TLSIdentity.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		A380B0BF2F96F47100FB766D /* macOS */ = {
+			isa = PBXGroup;
+			children = (
+				A380B0B82F96F47100FB766D /* Networking */,
+				A380B0B92F96F47100FB766D /* AirPDFMacApp.swift */,
+				A380B0BA2F96F47100FB766D /* AppDelegate.swift */,
+				A380B0BB2F96F47100FB766D /* AppModel.swift */,
+				A380B0BC2F96F47100FB766D /* ContentView.swift */,
+				A380B0BD2F96F47100FB766D /* DocumentSession.swift */,
+				A380B0BE2F96F47100FB766D /* DocumentSessionStore.swift */,
+			);
+			path = macOS;
+			sourceTree = "<group>";
+		};
+		A380B0C02F96F47100FB766D /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A380B1082F96F73400FB766D /* Generated */,
+				A380B0AE2F96F47100FB766D /* Core */,
+				A380B0B42F96F47100FB766D /* iPad */,
+				A380B0BF2F96F47100FB766D /* macOS */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A380B1082F96F73400FB766D /* Generated */ = {
+			isa = PBXGroup;
+			children = (
+				A380B1072F96F73400FB766D /* airpdf.pb.swift */,
+			);
+			path = Generated;
+			sourceTree = "<group>";
+		};
+		A380B10C2F96F8A500FB766D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A380B0472F96F21A00FB766D /* AirPDF */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A380B0692F96F21C00FB766D /* Build configuration list for PBXNativeTarget "AirPDF" */;
+			buildPhases = (
+				A380B0442F96F21A00FB766D /* Sources */,
+				A380B0452F96F21A00FB766D /* Frameworks */,
+				A380B0462F96F21A00FB766D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A380B04A2F96F21A00FB766D /* AirPDF */,
+			);
+			name = AirPDF;
+			packageProductDependencies = (
+				A380B10D2F96F8A500FB766D /* SwiftProtobuf */,
+			);
+			productName = AirPDF;
+			productReference = A380B0482F96F21A00FB766D /* AirPDF.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A380B0542F96F21C00FB766D /* AirPDFTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A380B06C2F96F21C00FB766D /* Build configuration list for PBXNativeTarget "AirPDFTests" */;
+			buildPhases = (
+				A380B0512F96F21C00FB766D /* Sources */,
+				A380B0522F96F21C00FB766D /* Frameworks */,
+				A380B0532F96F21C00FB766D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A380B0572F96F21C00FB766D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A380B0582F96F21C00FB766D /* AirPDFTests */,
+			);
+			name = AirPDFTests;
+			packageProductDependencies = (
+			);
+			productName = AirPDFTests;
+			productReference = A380B0552F96F21C00FB766D /* AirPDFTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A380B05E2F96F21C00FB766D /* AirPDFUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A380B06F2F96F21C00FB766D /* Build configuration list for PBXNativeTarget "AirPDFUITests" */;
+			buildPhases = (
+				A380B05B2F96F21C00FB766D /* Sources */,
+				A380B05C2F96F21C00FB766D /* Frameworks */,
+				A380B05D2F96F21C00FB766D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A380B0612F96F21C00FB766D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A380B0622F96F21C00FB766D /* AirPDFUITests */,
+			);
+			name = AirPDFUITests;
+			packageProductDependencies = (
+			);
+			productName = AirPDFUITests;
+			productReference = A380B05F2F96F21C00FB766D /* AirPDFUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A380B0402F96F21A00FB766D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					A380B0472F96F21A00FB766D = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					A380B0542F96F21C00FB766D = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = A380B0472F96F21A00FB766D;
+					};
+					A380B05E2F96F21C00FB766D = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = A380B0472F96F21A00FB766D;
+					};
+				};
+			};
+			buildConfigurationList = A380B0432F96F21A00FB766D /* Build configuration list for PBXProject "AirPDF" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A380B03F2F96F21A00FB766D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A380B0FA2F96F50A00FB766D /* XCRemoteSwiftPackageReference "swift-protobuf" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A380B0492F96F21A00FB766D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A380B0472F96F21A00FB766D /* AirPDF */,
+				A380B0542F96F21C00FB766D /* AirPDFTests */,
+				A380B05E2F96F21C00FB766D /* AirPDFUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A380B0462F96F21A00FB766D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A380B0532F96F21C00FB766D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A380B05D2F96F21C00FB766D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A380B0442F96F21A00FB766D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A380B0E72F96F47100FB766D /* TLSIdentity.swift in Sources */,
+				A380B0E82F96F47100FB766D /* AirPDFConstants.swift in Sources */,
+				A380B0E92F96F47100FB766D /* BonjourBrowser.swift in Sources */,
+				A380B0EA2F96F47100FB766D /* ContentView.swift in Sources */,
+				A380B0EC2F96F47100FB766D /* QuicServer.swift in Sources */,
+				A380B0ED2F96F47100FB766D /* FrameCodec.swift in Sources */,
+				A380B0EE2F96F47100FB766D /* AirPDFMacApp.swift in Sources */,
+				A380B0EF2F96F47100FB766D /* SyncEnvelope+Helpers.swift in Sources */,
+				A380B0F02F96F47100FB766D /* DocumentSessionStore.swift in Sources */,
+				A380B1092F96F73400FB766D /* airpdf.pb.swift in Sources */,
+				A380B0F12F96F47100FB766D /* AppModel.swift in Sources */,
+				A380B0F32F96F47100FB766D /* DocumentSession.swift in Sources */,
+				A380B0F42F96F47100FB766D /* AppDelegate.swift in Sources */,
+				A380B0F52F96F47100FB766D /* ClientConnection.swift in Sources */,
+				A380B0F62F96F47100FB766D /* ConnectionViewModel.swift in Sources */,
+				A380B0F72F96F47100FB766D /* ConnectionView.swift in Sources */,
+				A380B0F82F96F47100FB766D /* QuicClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A380B0512F96F21C00FB766D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A380B0D52F96F47100FB766D /* TLSIdentity.swift in Sources */,
+				A380B0D62F96F47100FB766D /* AirPDFConstants.swift in Sources */,
+				A380B0D72F96F47100FB766D /* BonjourBrowser.swift in Sources */,
+				A380B0D82F96F47100FB766D /* ContentView.swift in Sources */,
+				A380B0DA2F96F47100FB766D /* QuicServer.swift in Sources */,
+				A380B0DB2F96F47100FB766D /* FrameCodec.swift in Sources */,
+				A380B10A2F96F73400FB766D /* airpdf.pb.swift in Sources */,
+				A380B0DC2F96F47100FB766D /* AirPDFMacApp.swift in Sources */,
+				A380B0DD2F96F47100FB766D /* SyncEnvelope+Helpers.swift in Sources */,
+				A380B0DE2F96F47100FB766D /* DocumentSessionStore.swift in Sources */,
+				A380B0DF2F96F47100FB766D /* AppModel.swift in Sources */,
+				A380B0E12F96F47100FB766D /* DocumentSession.swift in Sources */,
+				A380B0E22F96F47100FB766D /* AppDelegate.swift in Sources */,
+				A380B0E32F96F47100FB766D /* ClientConnection.swift in Sources */,
+				A380B0E42F96F47100FB766D /* ConnectionViewModel.swift in Sources */,
+				A380B0E52F96F47100FB766D /* ConnectionView.swift in Sources */,
+				A380B0E62F96F47100FB766D /* QuicClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A380B05B2F96F21C00FB766D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A380B0C22F96F47100FB766D /* TLSIdentity.swift in Sources */,
+				A380B0C32F96F47100FB766D /* AirPDFConstants.swift in Sources */,
+				A380B0C42F96F47100FB766D /* BonjourBrowser.swift in Sources */,
+				A380B0C52F96F47100FB766D /* ContentView.swift in Sources */,
+				A380B0C72F96F47100FB766D /* QuicServer.swift in Sources */,
+				A380B0C82F96F47100FB766D /* FrameCodec.swift in Sources */,
+				A380B0C92F96F47100FB766D /* AirPDFMacApp.swift in Sources */,
+				A380B0CA2F96F47100FB766D /* SyncEnvelope+Helpers.swift in Sources */,
+				A380B0CB2F96F47100FB766D /* DocumentSessionStore.swift in Sources */,
+				A380B10B2F96F73400FB766D /* airpdf.pb.swift in Sources */,
+				A380B0CC2F96F47100FB766D /* AppModel.swift in Sources */,
+				A380B0CE2F96F47100FB766D /* DocumentSession.swift in Sources */,
+				A380B0CF2F96F47100FB766D /* AppDelegate.swift in Sources */,
+				A380B0D02F96F47100FB766D /* ClientConnection.swift in Sources */,
+				A380B0D12F96F47100FB766D /* ConnectionViewModel.swift in Sources */,
+				A380B0D22F96F47100FB766D /* ConnectionView.swift in Sources */,
+				A380B0D32F96F47100FB766D /* QuicClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A380B0572F96F21C00FB766D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A380B0472F96F21A00FB766D /* AirPDF */;
+			targetProxy = A380B0562F96F21C00FB766D /* PBXContainerItemProxy */;
+		};
+		A380B0612F96F21C00FB766D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A380B0472F96F21A00FB766D /* AirPDF */;
+			targetProxy = A380B0602F96F21C00FB766D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A380B0672F96F21C00FB766D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A380B0682F96F21C00FB766D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		A380B06A2F96F21C00FB766D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.encodeous.AirPDF;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		A380B06B2F96F21C00FB766D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.encodeous.AirPDF;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
+		A380B06D2F96F21C00FB766D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.encodeous.AirPDFTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AirPDF.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AirPDF";
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		A380B06E2F96F21C00FB766D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.encodeous.AirPDFTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AirPDF.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AirPDF";
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
+		A380B0702F96F21C00FB766D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.encodeous.AirPDFUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = AirPDF;
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		A380B0712F96F21C00FB766D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z34HEJ2RQF;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.encodeous.AirPDFUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = AirPDF;
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A380B0432F96F21A00FB766D /* Build configuration list for PBXProject "AirPDF" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A380B0672F96F21C00FB766D /* Debug */,
+				A380B0682F96F21C00FB766D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A380B0692F96F21C00FB766D /* Build configuration list for PBXNativeTarget "AirPDF" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A380B06A2F96F21C00FB766D /* Debug */,
+				A380B06B2F96F21C00FB766D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A380B06C2F96F21C00FB766D /* Build configuration list for PBXNativeTarget "AirPDFTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A380B06D2F96F21C00FB766D /* Debug */,
+				A380B06E2F96F21C00FB766D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A380B06F2F96F21C00FB766D /* Build configuration list for PBXNativeTarget "AirPDFUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A380B0702F96F21C00FB766D /* Debug */,
+				A380B0712F96F21C00FB766D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A380B0FA2F96F50A00FB766D /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-protobuf.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.37.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A380B10D2F96F8A500FB766D /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A380B0FA2F96F50A00FB766D /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A380B0402F96F21A00FB766D /* Project object */;
+}

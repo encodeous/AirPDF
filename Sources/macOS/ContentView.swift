@@ -1,8 +1,8 @@
-import AirPDFCore
+#if os(macOS)
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct ContentView: View {
+struct MacContentView: View {
     @EnvironmentObject private var appModel: AppModel
     @State private var showImporter = false
 
@@ -10,60 +10,56 @@ struct ContentView: View {
         NavigationSplitView {
             List(appModel.sessions, selection: $appModel.selectedSessionID) { session in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(session.fileName)
-                        .font(.headline)
-                    Text("\(session.pageCount) pages")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(session.fileName).font(.headline)
+                    Text("\(session.pageCount) pages").font(.caption).foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Documents")
             .toolbar {
-                ToolbarItemGroup {
-                    Button("Open PDF") { showImporter = true }
-                    Button("Close PDF") { appModel.closeSelectedPDF() }
+                ToolbarItem { Button("Open") { showImporter = true } }
+                ToolbarItem {
+                    Button("Close") { appModel.closeSelectedPDF() }
                         .disabled(appModel.selectedSessionID == nil)
                 }
             }
         } detail: {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("AirPDF macOS Host")
-                    .font(.largeTitle.bold())
-                Text("Server: \(appModel.serverState.label)")
-                    .foregroundStyle(.secondary)
-
-                HStack {
-                    Button("Start QUIC Server") {
-                        appModel.startServer()
-                    }
-                    .disabled(appModel.serverState == .running)
-
-                    Button("Stop Server") {
-                        appModel.stopServer()
-                    }
-                    .disabled(appModel.serverState == .stopped)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("AirPDF").font(.largeTitle.bold())
+                serverStatusView
+                if let err = appModel.lastError {
+                    Text(err).foregroundStyle(.red).font(.caption)
                 }
-
-                if let lastError = appModel.lastError {
-                    Text(lastError)
-                        .foregroundStyle(.red)
-                }
-
                 Spacer()
             }
             .padding()
         }
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [.pdf],
-            allowsMultipleSelection: true
-        ) { result in
-            switch result {
-            case .success(let urls):
-                appModel.openPDFs(at: urls)
-            case .failure(let error):
-                appModel.lastError = error.localizedDescription
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: true) {
+            if case .success(let urls) = $0 { appModel.openPDFs(at: urls) }
+        }
+        .onAppear { appModel.startServer() }
+    }
+
+    @ViewBuilder
+    private var serverStatusView: some View {
+        switch appModel.server.state {
+        case .stopped:
+            HStack {
+                Circle().fill(.red).frame(width: 8, height: 8)
+                Text("Server stopped")
+                Button("Start") { appModel.startServer() }.buttonStyle(.borderedProminent)
+            }
+        case .running(let port):
+            HStack {
+                Circle().fill(.orange).frame(width: 8, height: 8)
+                Text("Listening on port \(port) — waiting for iPad")
+            }
+        case .clientConnected(let sid):
+            HStack {
+                Circle().fill(.green).frame(width: 8, height: 8)
+                Text("iPad connected").bold()
+                Text("(\(sid.prefix(8))…)").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 }
+#endif

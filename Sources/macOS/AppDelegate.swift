@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -7,3 +8,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 }
+#endif

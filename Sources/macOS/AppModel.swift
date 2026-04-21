@@ -1,27 +1,28 @@
-import AirPDFCore
+#if os(macOS)
 import Foundation
+import Combine
 import PDFKit
+import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
-    private static let defaultServerPort: UInt16 = 9443
-
     @Published private(set) var sessions: [DocumentSession] = []
-    @Published private(set) var serverState: QuicServer.State = .stopped
     @Published var selectedSessionID: UUID?
     @Published var lastError: String?
 
-    let quicServer: QuicServer
+    let server = QuicServer()
     private let store = DocumentSessionStore()
 
-    init(quicServer: QuicServer = QuicServer()) {
-        self.quicServer = quicServer
-        self.quicServer.onStateChange = { [weak self] state in
-            Task { @MainActor in
-                self?.serverState = state
-            }
+    init() {
+        server.onClientConnected = { [weak self] client in
+            self?.onClientConnected(client)
+        }
+        server.onClientDisconnected = { [weak self] in
+            self?.lastError = nil
         }
     }
+
+    // MARK: - Documents
 
     @discardableResult
     func openPDF(at url: URL) -> Bool {
@@ -29,7 +30,6 @@ final class AppModel: ObservableObject {
             lastError = "Unable to open \(url.lastPathComponent)."
             return false
         }
-
         let session = DocumentSession(
             fileName: url.lastPathComponent,
             fileURL: url,
@@ -42,31 +42,67 @@ final class AppModel: ObservableObject {
     }
 
     func openPDFs(at urls: [URL]) {
-        var firstError: String?
-        for url in urls {
-            if !openPDF(at: url), firstError == nil {
-                firstError = lastError
-            }
-        }
-        lastError = firstError
+        for url in urls { openPDF(at: url) }
     }
 
     func closeSelectedPDF() {
-        guard let selectedSessionID else { return }
-        _ = store.remove(id: selectedSessionID)
+        guard let id = selectedSessionID,
+              let session = store.remove(id: id) else { return }
         sessions = store.sessions
-        self.selectedSessionID = sessions.last?.id
+        selectedSessionID = sessions.last?.id
+
+        // Notify iPad
+        if let client = activeClient {
+            var close = Airpdf_V1_PdfClose()
+            close.documentID = session.documentId
+            client.send(.wrap(.pdfClose(close)))
+        }
     }
 
-    func startServer(port: UInt16 = defaultServerPort) {
+    // MARK: - Server
+
+    func startServer() {
         do {
-            try quicServer.start(port: port)
+            try server.start()
         } catch {
             lastError = error.localizedDescription
         }
     }
 
     func stopServer() {
-        quicServer.stop()
+        server.stop()
+    }
+
+    // MARK: - Client events
+
+    private var activeClient: ClientConnection?
+
+    private func onClientConnected(_ client: ClientConnection) {
+        activeClient = client
+        client.onMessage = { [weak self] envelope in
+            self?.handleMessage(envelope)
+        }
+        // Re-send PdfData for all open documents so iPad can restore session state
+        // (Phase 2 will fill in actual PDF bytes; for Phase 1 we just send empty stubs)
+        for session in store.sessions {
+            var pdfData = Airpdf_V1_PdfData()
+            pdfData.documentID = session.documentId
+            pdfData.fileName = session.fileName
+            pdfData.pageCount = UInt32(session.pageCount)
+            client.send(.wrap(.pdfData(pdfData)))
+        }
+    }
+
+    private func handleMessage(_ envelope: Airpdf_V1_SyncEnvelope) {
+        // Phase 2+ will handle StrokeBatch, Undo, Redo, etc.
+        switch envelope.payload.body {
+        case .ping(let ping):
+            var pong = Airpdf_V1_Pong()
+            pong.sequence = ping.sequence
+            activeClient?.send(.wrap(.pong(pong)))
+        default:
+            break
+        }
     }
 }
+#endif
