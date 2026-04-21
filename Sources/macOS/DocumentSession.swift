@@ -17,6 +17,9 @@ final class DocumentSession: Identifiable, @unchecked Sendable {
     /// Active strokes = strokeLog[0..<undoIndex]. Undo decrements, redo increments.
     var strokeLog: [(id: String, page: Int, stroke: PKStroke)] = []
     var undoIndex: Int = 0
+    /// The undoIndex at the time of the last save (or open). Used to detect unsaved changes.
+    var savedUndoIndex: Int = 0
+    var hasUnsavedChanges: Bool { undoIndex != savedUndoIndex }
     var needsDisplayUpdate = false
     weak var pdfViewRef: PDFView?
     weak var overlayCoordinator: MacAnnotationCoordinator?

@@ -1,5 +1,6 @@
 import PDFKit
 import PencilKit
+import ImageIO
 
 #if canImport(UIKit)
 import UIKit
@@ -67,7 +68,17 @@ final class StrokeAnnotationLayer {
         }
     }
 
-    private static func makeAnnotation(stroke: PKStroke, page: PDFPage) -> StrokeStampAnnotation? {
+    /// Live-preview annotation — raw bitmap, fast.
+    static func makeAnnotation(stroke: PKStroke, page: PDFPage) -> StrokeStampAnnotation? {
+        makeAnnotation(stroke: stroke, page: page, compress: false)
+    }
+
+    /// Save-time annotation — PNG-compressed bitmap, smaller file.
+    static func makeSaveAnnotation(stroke: PKStroke, page: PDFPage) -> StrokeStampAnnotation? {
+        makeAnnotation(stroke: stroke, page: page, compress: true)
+    }
+
+    private static func makeAnnotation(stroke: PKStroke, page: PDFPage, compress: Bool) -> StrokeStampAnnotation? {
         let drawing = PKDrawing(strokes: [stroke])
         let pkBounds = drawing.bounds
         guard !pkBounds.isEmpty else { return nil }
@@ -79,35 +90,35 @@ final class StrokeAnnotationLayer {
             height: pkBounds.height
         )
         let pdfBounds = pdfDrawingRect.insetBy(dx: -5, dy: -5)
-        return StrokeStampAnnotation(drawing: drawing, drawingRect: pdfDrawingRect, bounds: pdfBounds)
+        return StrokeStampAnnotation(drawing: drawing, drawingRect: pdfDrawingRect, bounds: pdfBounds, compress: compress)
     }
 }
 
 // MARK: - Stamp annotation with 8× raster appearance
 
-private final class StrokeStampAnnotation: PDFAnnotation {
-    #if canImport(UIKit)
-    private let image: UIImage
-    #elseif canImport(AppKit)
-    private let image: NSImage
-    #endif
+final class StrokeStampAnnotation: PDFAnnotation {
+    private let cgImage: CGImage
     private let drawingRect: CGRect
 
-    init(drawing: PKDrawing, drawingRect: CGRect, bounds: CGRect) {
+    init(drawing: PKDrawing, drawingRect: CGRect, bounds: CGRect, compress: Bool = false) {
         #if canImport(UIKit)
         let traits = UITraitCollection(userInterfaceStyle: .light)
         var rendered: UIImage!
         traits.performAsCurrent {
             rendered = drawing.image(from: drawing.bounds, scale: 8.0)
         }
-        self.image = rendered
+        var cg = rendered.cgImage!
         #elseif canImport(AppKit)
         var rendered: NSImage!
         NSAppearance(named: .aqua)!.performAsCurrentDrawingAppearance {
             rendered = drawing.image(from: drawing.bounds, scale: 8.0)
         }
-        self.image = rendered
+        var cg = rendered.cgImage(forProposedRect: nil, context: nil, hints: nil)!
         #endif
+        if compress, let compressed = StrokeStampAnnotation.pngCompressed(cg) {
+            cg = compressed
+        }
+        self.cgImage = cg
         self.drawingRect = drawingRect
         super.init(bounds: bounds, forType: .stamp, withProperties: nil)
     }
@@ -117,11 +128,16 @@ private final class StrokeStampAnnotation: PDFAnnotation {
     override var hasAppearanceStream: Bool { true }
 
     override func draw(with box: PDFDisplayBox, in context: CGContext) {
-        #if canImport(UIKit)
-        guard let cgImage = image.cgImage else { return }
-        #elseif canImport(AppKit)
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        #endif
         context.draw(cgImage, in: drawingRect)
+    }
+
+    // Round-trip through PNG to get lossless compression before embedding in PDF.
+    private static func pngCompressed(_ source: CGImage) -> CGImage? {
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, source, [kCGImageDestinationLossyCompressionQuality: 1.0] as CFDictionary)
+        guard CGImageDestinationFinalize(dest),
+              let src = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(src, 0, nil)
     }
 }

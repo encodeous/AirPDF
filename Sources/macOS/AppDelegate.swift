@@ -7,5 +7,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        NotificationCenter.default.post(name: .openPDFURLs, object: urls)
+    }
+}
+
+extension Notification.Name {
+    static let openPDFURLs = Notification.Name("AirPDF.openPDFURLs")
 }
 #endif

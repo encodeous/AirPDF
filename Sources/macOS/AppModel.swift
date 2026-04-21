@@ -14,6 +14,7 @@ final class AppModel: ObservableObject {
     @Published var lastError: String?
     /// Session with a detected external file conflict (prompt user to reload or keep).
     @Published var fileConflictSession: DocumentSession?
+    @Published var showOpenPanel = false
 
     let server = QuicServer()
     private let store = DocumentSessionStore()
@@ -259,6 +260,7 @@ final class AppModel: ObservableObject {
         session.baseDrawings = drawings.compactMapValues { try? PKDrawing(data: $0) }
         session.strokeLog = []
         session.undoIndex = 0
+        session.savedUndoIndex = 0
         session.pdfViewRef?.document = newDoc
         session.overlayCoordinator?.rebuildAnnotations()
         // Re-send to iPad
@@ -302,10 +304,13 @@ final class AppModel: ObservableObject {
             att.contents = "airpdf_drawing.pkdata"
             att.setValue(drawingData, forAnnotationKey: PDFAnnotationKey(rawValue: "/FS"))
             page.addAnnotation(att)
-            // Visible stamp annotation (printable)
-            if let drawing = try? PKDrawing(data: drawingData), !drawing.strokes.isEmpty {
-                let bounds = drawing.bounds.insetBy(dx: -5, dy: -5)
-                page.addAnnotation(DrawingAnnotation(drawing: drawing, bounds: bounds))
+            // Visible stamp annotations (printable) — one per stroke, same path as live preview
+            if let drawing = try? PKDrawing(data: drawingData) {
+                for stroke in drawing.strokes {
+                    if let ann = StrokeAnnotationLayer.makeSaveAnnotation(stroke: stroke, page: page) {
+                        page.addAnnotation(ann)
+                    }
+                }
             }
         }
         // Write PDF data
@@ -320,6 +325,7 @@ final class AppModel: ObservableObject {
         }
         do {
             try pdfData.write(to: session.fileURL, options: .atomic)
+            session.savedUndoIndex = session.undoIndex
             logger.info("saveSelectedPDF: success → \(session.fileURL.path)")
         } catch {
             logger.error("saveSelectedPDF: write failed: \(error)")

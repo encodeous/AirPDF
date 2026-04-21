@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 
 struct MacContentView: View {
     @EnvironmentObject private var appModel: AppModel
-    @State private var showImporter = false
 
     var body: some View {
         NavigationSplitView {
@@ -19,7 +18,8 @@ struct MacContentView: View {
                     Button {
                         appModel.close(session: session)
                     } label: {
-                        Image(systemName: "xmark").foregroundStyle(.secondary)
+                        Image(systemName: session.hasUnsavedChanges ? "circle.fill" : "xmark")
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -27,8 +27,8 @@ struct MacContentView: View {
             .navigationTitle("Documents")
             .safeAreaInset(edge: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Divider()
                     ServerStatusView(server: appModel.server, onStart: { appModel.startServer() })
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if let err = appModel.lastError {
                         Text(err).foregroundStyle(.red).font(.caption)
                     }
@@ -37,49 +37,10 @@ struct MacContentView: View {
                 .padding(.vertical, 8)
                 .background(.bar)
             }
-            .toolbar {
-                ToolbarItem { Button("Open") { showImporter = true } }
-                ToolbarItem {
-                    Button("Save") { appModel.saveSelectedPDF() }
-                        .disabled(appModel.selectedSessionID == nil)
-                }
-                ToolbarItem {
-                    Button("Undo") {
-                        if let id = appModel.selectedSessionID,
-                           let s = appModel.sessions.first(where: { $0.id == id }) {
-                            appModel.handleUndo(session: s)
-                            appModel.objectWillChange.send()
-                        }
-                    }
-                    .keyboardShortcut("z", modifiers: .command)
-                    .disabled({
-                        guard let id = appModel.selectedSessionID,
-                              let s = appModel.sessions.first(where: { $0.id == id })
-                        else { return true }
-                        return s.undoIndex == 0
-                    }())
-                }
-                ToolbarItem {
-                    Button("Redo") {
-                        if let id = appModel.selectedSessionID,
-                           let s = appModel.sessions.first(where: { $0.id == id }) {
-                            appModel.handleRedo(session: s)
-                            appModel.objectWillChange.send()
-                        }
-                    }
-                    .keyboardShortcut("z", modifiers: [.command, .shift])
-                    .disabled({
-                        guard let id = appModel.selectedSessionID,
-                              let s = appModel.sessions.first(where: { $0.id == id })
-                        else { return true }
-                        return s.undoIndex >= s.strokeLog.count
-                    }())
-                }
-            }
         } detail: {
             detailView
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: true) {
+        .fileImporter(isPresented: $appModel.showOpenPanel, allowedContentTypes: [.pdf], allowsMultipleSelection: true) {
             if case .success(let urls) = $0 { appModel.openPDFs(at: urls) }
         }
         .alert("File Changed on Disk",
@@ -94,6 +55,15 @@ struct MacContentView: View {
             Text("\"\(session.fileName)\" was modified by another application. Reload from disk or keep your unsaved changes?")
         }
         .onAppear { appModel.startServer() }
+        .onReceive(NotificationCenter.default.publisher(for: .openPDFURLs)) { note in
+            if let urls = note.object as? [URL] { appModel.openPDFs(at: urls) }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            let pdfs = urls.filter { $0.pathExtension.lowercased() == "pdf" }
+            guard !pdfs.isEmpty else { return false }
+            appModel.openPDFs(at: pdfs)
+            return true
+        }
     }
 
     @ViewBuilder
