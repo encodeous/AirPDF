@@ -35,11 +35,11 @@ AirPDF turns an iPad into a real-time drawing tablet for marking up PDFs hosted 
 ## Current Status
 
 - [x] Phase 1: Core Networking & Discovery
-- [ ] Phase 2: Document Transfer & Display
+- [x] Phase 2: Document Transfer & Display
 - [ ] Phase 3: PencilKit & Drawing Sync
 - [ ] Phase 4: Refinement & Optimization
 
-**Current phase:** Phase 2  
+**Current phase:** Phase 2 3
 **Last worked on:** 2026-04-20
 
 ### Phase 1 completion notes
@@ -55,6 +55,10 @@ AirPDF turns an iPad into a real-time drawing tablet for marking up PDFs hosted 
 - iPad entitlements: `com.apple.security.network.client` + `com.apple.developer.networking.bonjour.client` for `_airpdf._udp` (`AirPDF/AirPDF-iOS.entitlements`).
 - `NSBonjourServices` in `Info.plist` for iPadOS Bonjour browsing permission.
 - SwiftUI observation fix: nested `@Published` objects (`QuicServer.state`, `BonjourBrowser.hosts`) observed via child views with `@ObservedObject` to avoid stale renders.
+
+### Phase 2 notes
+
+The notes are in `/design/impl/phase2.md`.
 
 ## Assumptions
 

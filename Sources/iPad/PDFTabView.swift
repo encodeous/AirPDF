@@ -30,6 +30,7 @@ struct PDFTabView: View {
                 }
                 if let doc = docs.first(where: { $0.id == sel }) ?? docs.first {
                     iPadPDFView(data: doc.pdfData)
+                        .id(doc.id)
                 }
             }
             .onChange(of: store.documents) { _, newDocs in

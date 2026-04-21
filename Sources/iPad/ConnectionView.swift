@@ -6,44 +6,45 @@ struct ConnectionView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch vm.client.state {
-                case .disconnected, .failed:
-                    hostListView
-                case .connecting, .handshaking:
-                    connectingView
-                case .connected:
-                    PDFTabView(store: vm.documentStore)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarLeading) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Label("Mac: \(vm.client.sessionFingerprint)", systemImage: "desktopcomputer")
-                                    Label("iPad: \(vm.client.ownFingerprint)", systemImage: "ipad")
-                                }
-                                .font(.caption2).monospaced().foregroundStyle(.secondary)
-                            }
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button("Disconnect", role: .destructive) { vm.disconnect() }
-                            }
-                        }
-                }
-            }
-            .navigationTitle("AirPDF")
+            ClientStateView(client: vm.client, vm: vm)
+                .navigationTitle("AirPDF")
         }
     }
+}
 
-    private var hostListView: some View {
-        HostListView(browser: vm.browser, onConnect: vm.connect, onConnectManual: vm.connectManual,
-                     failureReason: { if case .failed(let r) = vm.client.state { return r }; return nil }())
-    }
+private struct ClientStateView: View {
+    @ObservedObject var client: QuicClient
+    let vm: ConnectionViewModel
 
-    private var connectingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text(vm.client.state == .connecting ? "Connecting…" : "Handshaking…")
-                .foregroundStyle(.secondary)
-            Button("Cancel") { vm.disconnect() }
-                .buttonStyle(.bordered)
+    var body: some View {
+        Group {
+            switch client.state {
+            case .disconnected, .failed:
+                HostListView(browser: vm.browser, onConnect: vm.connect, onConnectManual: vm.connectManual,
+                             failureReason: { if case .failed(let r) = client.state { return r }; return nil }())
+            case .connecting, .handshaking:
+                VStack(spacing: 16) {
+                    ProgressView()
+                    Text(client.state == .connecting ? "Connecting…" : "Handshaking…")
+                        .foregroundStyle(.secondary)
+                    Button("Cancel") { vm.disconnect() }
+                        .buttonStyle(.bordered)
+                }
+            case .connected:
+                PDFTabView(store: vm.documentStore)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Label("Mac: \(client.sessionFingerprint)", systemImage: "desktopcomputer")
+                                Label("iPad: \(client.ownFingerprint)", systemImage: "ipad")
+                            }
+                            .font(.caption2).monospaced().foregroundStyle(.secondary)
+                        }
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Disconnect", role: .destructive) { vm.disconnect() }
+                        }
+                    }
+            }
         }
     }
 }
