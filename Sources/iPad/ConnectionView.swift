@@ -43,7 +43,7 @@ private struct ClientStateView: View {
                             }
                             .font(.caption2).monospaced().foregroundStyle(.secondary)
                         }
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItemGroup(placement: .topBarTrailing) {
                             Button("Disconnect", role: .destructive) { vm.disconnect() }
                         }
                     }

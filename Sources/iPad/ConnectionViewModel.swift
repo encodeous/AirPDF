@@ -62,23 +62,20 @@ final class ConnectionViewModel: ObservableObject {
         case .pdfClose(let msg):
             logger.info("Received PdfClose: docId=\(msg.documentID)")
             documentStore.close(documentId: msg.documentID)
-        case .strokeRemove(let msg):
-            // Mac undo feedback: remove strokes from the iPad canvas
-            logger.info("Received StrokeRemove from Mac: doc=\(msg.documentID) page=\(msg.pageIndex) ids=\(msg.strokeIds.count)")
-            activeDrawingVC?.applyRemoteStrokeRemove(pageIndex: Int(msg.pageIndex), strokeIds: msg.strokeIds)
-        case .strokeBatch(let msg):
-            // Mac redo feedback: add strokes back to the iPad canvas
-            logger.info("Received StrokeBatch from Mac: doc=\(msg.documentID) page=\(msg.pageIndex) strokes=\(msg.strokes.count)")
-            let entries: [(id: String, stroke: PKStroke)] = msg.strokes.compactMap { entry in
-                guard let d = try? PKDrawing(data: entry.pkStrokeData), let s = d.strokes.first else { return nil }
-                return (entry.strokeID, s)
-            }
-            activeDrawingVC?.applyRemoteStrokeBatch(pageIndex: Int(msg.pageIndex), entries: entries)
+        case .strokeRemove, .strokeBatch:
+            // Ignored — DrawingsUpdate is the authoritative state sync for undo/redo.
+            // Individual StrokeRemove/StrokeBatch from Mac are always followed by DrawingsUpdate.
+            break
         case .drawingsUpdate(let msg):
+            // Authoritative drawing state from Mac (sent after every undo/redo).
+            // Update both the document store and the live annotation coordinator.
             logger.info("Received DrawingsUpdate from Mac: doc=\(msg.documentID) pages=\(msg.pageDrawings.count)")
             documentStore.applyDrawingsUpdate(msg)
+            for (k, v) in msg.pageDrawings {
+                activeDrawingVC?.overlayCoordinator.applyRemoteDrawingUpdate(pageIndex: Int(k), drawingData: v)
+            }
         default:
-            logger.info("Received unhandled message type")
+            break
         }
     }
 }

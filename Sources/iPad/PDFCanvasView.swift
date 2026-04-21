@@ -62,17 +62,16 @@ final class DrawingViewController: UIViewController {
 
     override var canBecomeFirstResponder: Bool { true }
 
-    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        if action == #selector(undo(_:)) || action == #selector(redo(_:)) { return true }
-        return super.canPerformAction(action, withSender: sender)
-    }
-
-    @objc func undo(_ sender: Any?) {
-        onStrokeDelta?(.wrap(.undo({ var m = Airpdf_V1_Undo(); m.documentID = overlayCoordinator.docId; return m }())))
-    }
-
-    @objc func redo(_ sender: Any?) {
-        onStrokeDelta?(.wrap(.redo({ var m = Airpdf_V1_Redo(); m.documentID = overlayCoordinator.docId; return m }())))
+    /// Register one undo action on the VC's undoManager so PKToolPicker's built-in
+    /// undo/redo buttons stay in sync with the Mac's stroke log.
+    func registerUndoAction() {
+        undoManager?.registerUndo(withTarget: self) { vc in
+            vc.onStrokeDelta?(.wrap(.undo({ var m = Airpdf_V1_Undo(); m.documentID = vc.overlayCoordinator.docId; return m }())))
+            vc.undoManager?.registerUndo(withTarget: vc) { vc2 in
+                vc2.onStrokeDelta?(.wrap(.redo({ var m = Airpdf_V1_Redo(); m.documentID = vc2.overlayCoordinator.docId; return m }())))
+                vc2.registerUndoAction()
+            }
+        }
     }
 
     override func viewDidLoad() {
@@ -109,6 +108,7 @@ final class DrawingViewController: UIViewController {
 
     func loadDocument(_ doc: TabDocument) {
         overlayCoordinator.reset()
+        undoManager?.removeAllActions()
 
         guard isViewLoaded else {
             pendingDoc = doc
@@ -132,6 +132,8 @@ final class DrawingViewController: UIViewController {
             toolPicker: toolPicker,
             onStrokeDelta: { [weak self] env in self?.onStrokeDelta?(env) }
         )
+        overlayCoordinator.onNeedsFirstResponder = { [weak self] in self?.becomeFirstResponder() }
+        overlayCoordinator.onStrokeCommitted = { [weak self] in self?.registerUndoAction() }
         pdfView.document = PDFDocument(data: doc.pdfData)
         becomeFirstResponder()
         logger.info("applyDocument: \(doc.id), \(doc.pageCount) pages")
@@ -188,6 +190,10 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
     private weak var toolPicker: PKToolPicker?
     private weak var pdfViewRef: PDFView?
     private var onStrokeDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
+    /// Called after page re-insert to reclaim first responder on the VC.
+    var onNeedsFirstResponder: (() -> Void)?
+    /// Called when a stroke is committed to annotations — VC registers an undo action.
+    var onStrokeCommitted: (() -> Void)?
 
     var activeCanvases: [PKCanvasView] { Array(pageToViewMapping.values) }
 
@@ -245,6 +251,7 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         // Clear the canvas and differ — strokes now live in annotations, not on the canvas.
         differs[pageIndex]?.clearKnown()
         clearCanvas(pageIndex: pageIndex)
+        onStrokeCommitted?()
     }
 
     /// Remove stroke annotations by ID.
@@ -284,9 +291,10 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
             doc.insert(page, at: pageIndex)
         }
         if let savedOffset { scrollView?.contentOffset = savedOffset }
+        onNeedsFirstResponder?()
     }
 
-    /// Exit eraser mode: clear canvas, re-add surviving strokes as annotations.
+    /// Exit edit mode: clear canvas, re-add surviving strokes as annotations.
     func exitEditMode() {
         guard isEditMode else { return }
         isEditMode = false
@@ -328,22 +336,32 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
     }
 
     /// Apply a remote drawing update (Mac undo/redo feedback).
-    /// Rebuilds annotations from the new drawing and keeps the canvas clear.
+    /// Rebuilds annotations from the new drawing. Uses page re-insert to clear stale visuals.
     func applyRemoteDrawingUpdate(pageIndex: Int, drawingData: Data) {
         pageDrawings[pageIndex] = drawingData
         guard let drawing = try? PKDrawing(data: drawingData) else { return }
-        // Rebuild committedStrokes with fresh IDs
         let strokes: [(id: String, stroke: PKStroke)] = drawing.strokes.map { (UUID().uuidString, $0) }
         committedStrokes[pageIndex] = strokes
         differs[pageIndex]?.clearKnown()
-        // Rebuild annotations
+        // Nuke old annotation layer
         annotationLayers[pageIndex]?.removeAll()
-        if let layer = annotationLayer(for: pageIndex) {
-            for (id, stroke) in strokes {
-                layer.addStroke(id: id, stroke: stroke)
-            }
+        annotationLayers.removeValue(forKey: pageIndex)
+        // Create fresh layer with new strokes (before page re-insert so overlayViewFor sees it)
+        guard let page = pdfPage(for: pageIndex) else { return }
+        let layer = StrokeAnnotationLayer(page: page)
+        annotationLayers[pageIndex] = layer
+        for (id, stroke) in strokes {
+            layer.addStroke(id: id, stroke: stroke)
         }
-        clearCanvas(pageIndex: pageIndex)
+        // Page re-insert to clear stale annotation visuals
+        guard let doc = page.document else { return }
+        let scrollView = pdfViewRef?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView
+        let savedOffset = scrollView?.contentOffset
+        let idx = doc.index(for: page)
+        doc.removePage(at: idx)
+        doc.insert(page, at: idx)
+        if let savedOffset { scrollView?.contentOffset = savedOffset }
+        onNeedsFirstResponder?()
     }
 
     /// Remove strokes by ID (Mac undo feedback). Updates annotations.
