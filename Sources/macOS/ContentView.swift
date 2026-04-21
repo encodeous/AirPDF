@@ -9,29 +9,38 @@ struct MacContentView: View {
     var body: some View {
         NavigationSplitView {
             List(appModel.sessions, selection: $appModel.selectedSessionID) { session in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(session.fileName).font(.headline)
-                    Text("\(session.pageCount) pages").font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.fileName).font(.headline)
+                        Text("\(session.pageCount) pages").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button {
+                        appModel.close(session: session)
+                    } label: {
+                        Image(systemName: "xmark").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .navigationTitle("Documents")
+            .safeAreaInset(edge: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider()
+                    ServerStatusView(server: appModel.server, onStart: { appModel.startServer() })
+                    if let err = appModel.lastError {
+                        Text(err).foregroundStyle(.red).font(.caption)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.bar)
+            }
             .toolbar {
                 ToolbarItem { Button("Open") { showImporter = true } }
-                ToolbarItem {
-                    Button("Close") { appModel.closeSelectedPDF() }
-                        .disabled(appModel.selectedSessionID == nil)
-                }
             }
         } detail: {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("AirPDF").font(.largeTitle.bold())
-                serverStatusView
-                if let err = appModel.lastError {
-                    Text(err).foregroundStyle(.red).font(.caption)
-                }
-                Spacer()
-            }
-            .padding()
+            detailView
         }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: true) {
             if case .success(let urls) = $0 { appModel.openPDFs(at: urls) }
@@ -40,8 +49,46 @@ struct MacContentView: View {
     }
 
     @ViewBuilder
-    private var serverStatusView: some View {
-        ServerStatusView(server: appModel.server, onStart: { appModel.startServer() })
+    private var detailView: some View {
+        if let id = appModel.selectedSessionID,
+           let session = appModel.sessions.first(where: { $0.id == id }) {
+            MacPDFView(document: session.pdfDocument)
+        } else {
+            ContentUnavailableView("No Document Selected", systemImage: "doc.fill",
+                                   description: Text("Open a PDF to get started."))
+        }
+    }
+}
+
+private struct ConnectedDotButton: View {
+    let sid: String
+    let peerFingerprint: String
+    let ownFingerprint: String
+    let onDisconnect: () -> Void
+    @State private var showPopover = false
+
+    var body: some View {
+        Button { showPopover.toggle() } label: {
+            HStack(spacing: 6) {
+                Circle().fill(.green).frame(width: 8, height: 8)
+                Text(peerFingerprint).font(.caption).foregroundStyle(.secondary).monospaced()
+            }
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showPopover, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("iPad connected").bold()
+                Divider()
+                Label("Mac: \(ownFingerprint)", systemImage: "desktopcomputer").font(.caption).monospaced()
+                Label("iPad: \(peerFingerprint)", systemImage: "ipad").font(.caption).monospaced()
+                Text("Session: \(sid.prefix(8))…").font(.caption).foregroundStyle(.secondary)
+                Divider()
+                Button("Disconnect", role: .destructive, action: onDisconnect)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+            .padding()
+        }
     }
 }
 
@@ -50,7 +97,6 @@ private struct ServerStatusView: View {
     var onStart: () -> Void
 
     var body: some View {
-        let _ = print("[UI] serverStatusView rendering, state=\(server.state)")
         switch server.state {
         case .stopped:
             HStack {
@@ -61,14 +107,12 @@ private struct ServerStatusView: View {
         case .running(let port):
             HStack {
                 Circle().fill(.orange).frame(width: 8, height: 8)
-                Text("Listening on port \(port) — waiting for iPad")
+                Text("Port: \(String(port))")
             }
-        case .clientConnected(let sid):
-            HStack {
-                Circle().fill(.green).frame(width: 8, height: 8)
-                Text("iPad connected").bold()
-                Text("(\(sid.prefix(8))…)").font(.caption).foregroundStyle(.secondary)
-            }
+        case .clientConnected(let sid, let fingerprint):
+            ConnectedDotButton(sid: sid, peerFingerprint: fingerprint,
+                               ownFingerprint: server.ownFingerprint,
+                               onDisconnect: { server.disconnectClient() })
         }
     }
 }

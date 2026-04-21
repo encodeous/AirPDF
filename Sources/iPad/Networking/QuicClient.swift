@@ -18,6 +18,10 @@ final class QuicClient: ObservableObject {
     }
 
     @Published private(set) var state: State = .disconnected
+    /// Fingerprint of the Mac's server certificate (read from SecTrust in verify block).
+    @Published private(set) var sessionFingerprint: String = ""
+    /// Fingerprint of our own ephemeral client certificate.
+    @Published private(set) var ownFingerprint: String = ""
 
     var onMessage: ((Airpdf_V1_SyncEnvelope) -> Void)?
 
@@ -39,19 +43,41 @@ final class QuicClient: ObservableObject {
 
         let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
         quicOptions.direction = .bidirectional
+
+        // Generate ephemeral client identity. The server requires a client cert (mTLS),
+        // so we must present one and respond to the CertificateRequest via challenge_block.
+        do {
+            let identity = try TLSIdentity.ephemeral()
+            sec_protocol_options_set_local_identity(quicOptions.securityProtocolOptions, identity.secIdentity)
+            sec_protocol_options_set_challenge_block(
+                quicOptions.securityProtocolOptions,
+                { _, complete in complete(identity.secIdentity) },
+                queue
+            )
+            let fp = TLSFingerprint.of(identity.certificate)
+            Task { @MainActor in self.ownFingerprint = fp }
+        } catch {
+            logger.error("TLSIdentity.ephemeral() failed: \(error)")
+        }
+
+        // Read the Mac's server cert fingerprint from SecTrust during the verify block.
         sec_protocol_options_set_verify_block(
             quicOptions.securityProtocolOptions,
-            { _, _, completion in completion(true) },
+            { [weak self] _, trust, completion in
+                let fp = SecTrustGetCertificateAtIndex(sec_trust_copy_ref(trust).takeRetainedValue(), 0)
+                    .map { TLSFingerprint.of($0) } ?? "unknown"
+                Task { @MainActor in self?.sessionFingerprint = fp }
+                completion(true)
+            },
             queue
         )
+        // Disable session resumption so the verify block always fires on every connection.
+        sec_protocol_options_set_tls_resumption_enabled(quicOptions.securityProtocolOptions, false)
 
         let params = NWParameters(quic: quicOptions)
         let conn = NWConnection(to: endpoint, using: params)
         connection = conn
-
-        conn.stateUpdateHandler = { [weak self] s in
-            Task { @MainActor in self?.handleConnectionState(s) }
-        }
+        conn.stateUpdateHandler = { [weak self] s in Task { @MainActor in self?.handleConnectionState(s) } }
         conn.start(queue: queue)
     }
 
@@ -124,15 +150,8 @@ final class QuicClient: ObservableObject {
             guard let self else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if let data, !data.isEmpty {
-                    self.receiveBuffer.append(data)
-                    self.drainBuffer()
-                }
-                if let error {
-                    self.logger.error("Receive error: \(error)")
-                    self.teardown(reason: error.localizedDescription)
-                    return
-                }
+                if let data, !data.isEmpty { self.receiveBuffer.append(data); self.drainBuffer() }
+                if let error { self.logger.error("Receive error: \(error)"); self.teardown(reason: error.localizedDescription); return }
                 if isComplete { self.teardown(reason: nil); return }
                 self.startReceiving()
             }
@@ -140,9 +159,7 @@ final class QuicClient: ObservableObject {
     }
 
     private func drainBuffer() {
-        while let envelope = try? FrameCodec.decode(from: &receiveBuffer) {
-            handle(envelope)
-        }
+        while let envelope = try? FrameCodec.decode(from: &receiveBuffer) { handle(envelope) }
     }
 
     private func handle(_ envelope: Airpdf_V1_SyncEnvelope) {
@@ -163,6 +180,8 @@ final class QuicClient: ObservableObject {
         connection?.cancel()
         connection = nil
         receiveBuffer = Data()
+        sessionFingerprint = ""
+        ownFingerprint = ""
         state = reason != nil ? .failed(reason!) : .disconnected
     }
 }

@@ -2,6 +2,7 @@
 import Foundation
 import Combine
 import PDFKit
+import CryptoKit
 import SwiftUI
 
 @MainActor
@@ -26,18 +27,24 @@ final class AppModel: ObservableObject {
 
     @discardableResult
     func openPDF(at url: URL) -> Bool {
+        _ = url.startAccessingSecurityScopedResource()
         guard let document = PDFDocument(url: url) else {
+            url.stopAccessingSecurityScopedResource()
             lastError = "Unable to open \(url.lastPathComponent)."
             return false
         }
         let session = DocumentSession(
             fileName: url.lastPathComponent,
             fileURL: url,
-            pageCount: document.pageCount
+            pdfDocument: document
         )
         store.upsert(session)
         sessions = store.sessions
         selectedSessionID = session.id
+        // Push to connected iPad immediately
+        if let client = activeClient {
+            client.send(.wrap(.pdfData(makePdfData(for: session))))
+        }
         return true
     }
 
@@ -46,12 +53,21 @@ final class AppModel: ObservableObject {
     }
 
     func closeSelectedPDF() {
-        guard let id = selectedSessionID,
-              let session = store.remove(id: id) else { return }
-        sessions = store.sessions
-        selectedSessionID = sessions.last?.id
+        guard let id = selectedSessionID else { return }
+        close(id: id)
+    }
 
-        // Notify iPad
+    func close(session: DocumentSession) {
+        close(id: session.id)
+    }
+
+    private func close(id: UUID) {
+        guard let session = store.remove(id: id) else { return }
+        session.fileURL.stopAccessingSecurityScopedResource()
+        sessions = store.sessions
+        if selectedSessionID == id {
+            selectedSessionID = sessions.last?.id
+        }
         if let client = activeClient {
             var close = Airpdf_V1_PdfClose()
             close.documentID = session.documentId
@@ -59,15 +75,27 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - PdfData builder
+
+    private func makePdfData(for session: DocumentSession) -> Airpdf_V1_PdfData {
+        let content = PDFStripper.strip(document: session.pdfDocument)
+        let digest = SHA256.hash(data: content)
+        var msg = Airpdf_V1_PdfData()
+        msg.documentID = session.documentId
+        msg.fileName = session.fileName
+        msg.content = content
+        msg.contentSha256 = Data(digest)
+        msg.pageCount = UInt32(session.pageCount)
+        msg.pageDrawings = session.pageDrawings.reduce(into: [:]) { $0[UInt32($1.key)] = $1.value }
+        return msg
+    }
+
     // MARK: - Server
 
     func startServer() {
         do {
-            print("[AppModel] startServer called, current state=\(server.state)")
             try server.start()
-            print("[AppModel] server.start() returned, state=\(server.state)")
         } catch {
-            print("[AppModel] server.start() threw: \(error)")
             lastError = error.localizedDescription
         }
     }
@@ -85,23 +113,14 @@ final class AppModel: ObservableObject {
         client.onMessage = { [weak self] envelope in
             self?.handleMessage(envelope)
         }
-        // Re-send PdfData for all open documents so iPad can restore session state
-        // (Phase 2 will fill in actual PDF bytes; for Phase 1 we just send empty stubs)
+        // Re-send PdfData for all open documents
         for session in store.sessions {
-            var pdfData = Airpdf_V1_PdfData()
-            pdfData.documentID = session.documentId
-            pdfData.fileName = session.fileName
-            pdfData.pageCount = UInt32(session.pageCount)
-            client.send(.wrap(.pdfData(pdfData)))
+            client.send(.wrap(.pdfData(makePdfData(for: session))))
         }
     }
 
     private func handleMessage(_ envelope: Airpdf_V1_SyncEnvelope) {
-        // Phase 2+ will handle StrokeBatch, Undo, Redo, etc.
-        switch envelope.payload.body {
-        default:
-            break
-        }
+        // Phase 3+ will handle StrokeBatch, Undo, Redo, etc.
     }
 }
 #endif

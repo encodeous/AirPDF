@@ -11,10 +11,11 @@ final class QuicServer: ObservableObject {
     enum State: Equatable {
         case stopped
         case running(port: UInt16)
-        case clientConnected(sessionId: String)
+        case clientConnected(sessionId: String, fingerprint: String)
     }
 
     @Published private(set) var state: State = .stopped
+    @Published private(set) var ownFingerprint: String = ""
 
     private var listener: NWListener?
     private var activeClient: ClientConnection?
@@ -28,7 +29,7 @@ final class QuicServer: ObservableObject {
     func start() throws {
         guard state == .stopped else { return }
 
-        let identity = try TLSIdentity.selfSigned()
+        let identity = try TLSIdentity.ephemeral()
 
         let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
         quicOptions.direction = .bidirectional
@@ -41,7 +42,22 @@ final class QuicServer: ObservableObject {
             quicOptions.securityProtocolOptions,
             .TLSv12
         )
-        print("[QuicServer] TLS identity set on QUIC options")
+        // Disable session resumption so every connection does a full handshake.
+        sec_protocol_options_set_tls_resumption_enabled(
+            quicOptions.securityProtocolOptions, false
+        )
+        // Require client certificate (mTLS). Handshake fails if client doesn't present one.
+        sec_protocol_options_set_peer_authentication_required(
+            quicOptions.securityProtocolOptions, true
+        )
+        // Accept all client certificates; fingerprint extracted post-handshake.
+        sec_protocol_options_set_verify_block(
+            quicOptions.securityProtocolOptions,
+            { _, _, completion in completion(true) },
+            queue
+        )
+        // Store our own fingerprint for display
+        self.ownFingerprint = TLSFingerprint.of(identity.certificate)
 
         let params = NWParameters(quic: quicOptions)
         params.allowLocalEndpointReuse = true
@@ -80,6 +96,11 @@ final class QuicServer: ObservableObject {
         state = .stopped
     }
 
+    func disconnectClient() {
+        activeClient?.cancel()
+        // state update handled by onDisconnect callback
+    }
+
     // MARK: - Incoming connection
 
     private func handleIncoming(_ conn: NWConnection) {
@@ -94,18 +115,17 @@ final class QuicServer: ObservableObject {
                 }
             }
         }
-        client.onSessionEstablished = { [weak self] sessionId in
+        client.onSessionEstablished = { [weak self] sessionId, fingerprint in
             Task { @MainActor in
                 guard let self else { return }
                 if self.activeClient != nil {
-                    // Another connection won the race — reject this one
                     client.sendError(.clientAlreadyConnected, message: "A client is already connected.")
                     client.cancel()
                     self.logger.warning("Rejected second client connection (post-handshake)")
                     return
                 }
                 self.activeClient = client
-                self.state = .clientConnected(sessionId: sessionId)
+                self.state = .clientConnected(sessionId: sessionId, fingerprint: fingerprint)
                 self.onClientConnected?(client)
             }
         }

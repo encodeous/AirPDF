@@ -70,18 +70,8 @@ message Payload {
 
 // iPad → Mac on every new QUIC connection.
 message Hello {
-  // Semantic version of the AirPDF wire protocol (e.g. "1.0.0").
-  // The Mac rejects incompatible versions with ERROR_CODE_UNSUPPORTED_VERSION
-  // followed by connection teardown.
   string protocol_version = 1;
-
-  // Human-readable app build version for diagnostic logging (e.g. "0.1.0").
   string app_version = 2;
-
-  // Optional: session_id from a previous Welcome. When present, the iPad is
-  // requesting session resume after a reconnect (e.g. returning from background).
-  // The Mac honors this only if the session is still alive within the 1-minute
-  // timeout window; otherwise it issues a fresh session_id in Welcome.
   string resume_session_id = 3;
 }
 
