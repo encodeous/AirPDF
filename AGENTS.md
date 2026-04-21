@@ -34,13 +34,27 @@ AirPDF turns an iPad into a real-time drawing tablet for marking up PDFs hosted 
 
 ## Current Status
 
-- [ ] Phase 1: Core Networking & Discovery
+- [x] Phase 1: Core Networking & Discovery
 - [ ] Phase 2: Document Transfer & Display
 - [ ] Phase 3: PencilKit & Drawing Sync
 - [ ] Phase 4: Refinement & Optimization
 
-**Current phase:** Not started  
-**Last worked on:** —
+**Current phase:** Phase 2  
+**Last worked on:** 2026-04-20
+
+### Phase 1 completion notes
+
+- `NWListener` on macOS with QUIC + self-signed TLS identity (generated via `swift-certificates` each launch, stored ephemerally in keychain for `SecIdentityCreate` pairing).
+- Bonjour advertisement (`_airpdf._udp`) on Mac via `listener.service`; browsing on iPad via `NWBrowser`.
+- `Hello`/`Welcome` handshake with protocol version validation and single-client enforcement (rejection deferred to post-handshake to handle Happy Eyeballs multi-address probing).
+- Session resume: iPad sends `resume_session_id` in `Hello`; Mac echoes it back in `Welcome`.
+- Keepalive: iPad sends `Heartbeat` every 5 s; Mac silently ignores it.
+- `FrameCodec`: 4-byte big-endian length-prefix framing using `startIndex`-relative slice indexing and `loadUnaligned` for safe unaligned reads.
+- Protobuf code generation via SwiftProtobufPlugin build tool plugin + `proto/swift-protobuf-config.json`.
+- Mac entitlements: `com.apple.security.network.server` + `com.apple.security.network.client` + read-write file access (`AirPDF/AirPDF-macOS.entitlements`).
+- iPad entitlements: `com.apple.security.network.client` + `com.apple.developer.networking.bonjour.client` for `_airpdf._udp` (`AirPDF/AirPDF-iOS.entitlements`).
+- `NSBonjourServices` in `Info.plist` for iPadOS Bonjour browsing permission.
+- SwiftUI observation fix: nested `@Published` objects (`QuicServer.state`, `BonjourBrowser.hosts`) observed via child views with `@ObservedObject` to avoid stale renders.
 
 ## Assumptions
 
