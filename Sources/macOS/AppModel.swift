@@ -83,20 +83,6 @@ final class AppModel: ObservableObject {
 
     // MARK: - Builders
 
-    private func pageStrokesMap(for session: DocumentSession) -> [UInt32: Airpdf_V1_PageStrokes] {
-        var map: [UInt32: Airpdf_V1_PageStrokes] = [:]
-        for entry in session.strokeLog[0..<session.undoIndex] {
-            let key = UInt32(entry.page)
-            var ps = map[key] ?? Airpdf_V1_PageStrokes()
-            var se = Airpdf_V1_StrokeEntry()
-            se.strokeID = entry.id.uuidString
-            se.pkStrokeData = (try? PKDrawing(strokes: [entry.stroke]).dataRepresentation()) ?? Data()
-            ps.strokes.append(se)
-            map[key] = ps
-        }
-        return map
-    }
-
     private func makePdfData(for session: DocumentSession) -> Airpdf_V1_PdfData {
         let content = PDFStripper.strip(document: session.pdfDocument)
         var msg = Airpdf_V1_PdfData()
@@ -105,14 +91,14 @@ final class AppModel: ObservableObject {
         msg.content = content
         msg.contentSha256 = Data(SHA256.hash(data: content))
         msg.pageCount = UInt32(session.pageCount)
-        msg.pageStrokes = pageStrokesMap(for: session)
+        msg.pageStrokes = session.model.pageStrokesMap()
         return msg
     }
 
     private func makeDrawingsUpdate(for session: DocumentSession) -> Airpdf_V1_DrawingsUpdate {
         var msg = Airpdf_V1_DrawingsUpdate()
         msg.documentID = session.documentId
-        msg.pageStrokes = pageStrokesMap(for: session)
+        msg.pageStrokes = session.model.pageStrokesMap()
         return msg
     }
 
@@ -136,14 +122,15 @@ final class AppModel: ObservableObject {
         case .strokeBatch(let msg):
             guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
             let pageIdx = Int(msg.pageIndex)
-            session.strokeLog.removeSubrange(session.undoIndex...)
-            for entry in msg.strokes {
+            let entries: [(id: UUID, page: Int, stroke: PKStroke)] = msg.strokes.compactMap { entry in
                 guard let uuid = UUID(uuidString: entry.strokeID),
                       let drawing = try? PKDrawing(data: entry.pkStrokeData),
-                      let stroke = drawing.strokes.first else { continue }
-                session.strokeLog.append((id: uuid, page: pageIdx, stroke: stroke))
-                session.undoIndex += 1
-                session.overlayCoordinator?.addStrokeAnnotation(page: pageIdx, id: entry.strokeID, stroke: stroke)
+                      let stroke = drawing.strokes.first else { return nil }
+                return (id: uuid, page: pageIdx, stroke: stroke)
+            }
+            session.model.addStrokes(entries)
+            for e in entries {
+                session.overlayCoordinator?.addStrokeAnnotation(page: e.page, id: e.id.uuidString, stroke: e.stroke)
             }
             objectWillChange.send()
 
@@ -151,8 +138,7 @@ final class AppModel: ObservableObject {
             guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
             let pageIdx = Int(msg.pageIndex)
             let removeSet = Set(msg.strokeIds)
-            session.strokeLog.removeAll { removeSet.contains($0.id.uuidString) }
-            session.undoIndex = min(session.undoIndex, session.strokeLog.count)
+            session.model.removeStrokes(ids: Set(removeSet.compactMap { UUID(uuidString: $0) }))
             session.overlayCoordinator?.removeStrokeAnnotations(page: pageIdx, ids: removeSet)
             objectWillChange.send()
 
@@ -169,28 +155,14 @@ final class AppModel: ObservableObject {
     }
 
     func handleUndo(session: DocumentSession) {
-        guard session.undoIndex > 0 else { return }
-        session.undoIndex -= 1
-        let entry = session.strokeLog[session.undoIndex]
+        guard let entry = session.model.undo() else { return }
         session.overlayCoordinator?.removeStrokeAnnotations(page: entry.page, ids: [entry.id.uuidString])
-        var rm = Airpdf_V1_StrokeRemove()
-        rm.documentID = session.documentId; rm.pageIndex = UInt32(entry.page); rm.strokeIds = [entry.id.uuidString]
-        activeClient?.send(.wrap(.strokeRemove(rm)))
         activeClient?.send(.wrap(.drawingsUpdate(makeDrawingsUpdate(for: session))))
     }
 
     func handleRedo(session: DocumentSession) {
-        guard session.undoIndex < session.strokeLog.count else { return }
-        let entry = session.strokeLog[session.undoIndex]
-        session.undoIndex += 1
+        guard let entry = session.model.redo() else { return }
         session.overlayCoordinator?.addStrokeAnnotation(page: entry.page, id: entry.id.uuidString, stroke: entry.stroke)
-        var batch = Airpdf_V1_StrokeBatch()
-        batch.documentID = session.documentId; batch.pageIndex = UInt32(entry.page)
-        var se = Airpdf_V1_StrokeEntry()
-        se.strokeID = entry.id.uuidString
-        se.pkStrokeData = (try? PKDrawing(strokes: [entry.stroke]).dataRepresentation()) ?? Data()
-        batch.strokes = [se]
-        activeClient?.send(.wrap(.strokeBatch(batch)))
         activeClient?.send(.wrap(.drawingsUpdate(makeDrawingsUpdate(for: session))))
     }
 
@@ -210,8 +182,7 @@ final class AppModel: ObservableObject {
         session.hasExternalConflict = false
         fileConflictSession = nil
         guard let newDoc = PDFDocument(url: session.fileURL) else { return }
-        session.loadStrokesFromDisk(pdfDocument: newDoc)
-        session.savedUndoIndex = session.undoIndex
+        session.reloadFromDisk(pdfDocument: newDoc)
         session.pdfViewRef?.document = newDoc
         session.overlayCoordinator?.rebuildAnnotations()
         if let client = activeClient { client.send(.wrap(.pdfData(makePdfData(for: session)))) }
@@ -234,13 +205,8 @@ final class AppModel: ObservableObject {
         session.stopWatching()
         session.overlayCoordinator?.removeAllAnnotations()
 
-        // Group active strokes by page
-        var byPage: [Int: [(UUID, PKStroke)]] = [:]
-        for entry in session.strokeLog[0..<session.undoIndex] {
-            byPage[entry.page, default: []].append((entry.id, entry.stroke))
-        }
+        let byPage = session.model.allActiveStrokes()
 
-        // For each page: remove old AirPDF annotations, write airpdf_strokes.pb + stamp annotations
         for i in 0..<session.pageCount {
             guard let page = session.pdfDocument.page(at: i) else { continue }
             page.annotations
@@ -249,7 +215,6 @@ final class AppModel: ObservableObject {
 
             guard let strokes = byPage[i], !strokes.isEmpty else { continue }
 
-            // airpdf_strokes.pb — canonical stroke data with UUIDs
             var ps = Airpdf_V1_PageStrokes()
             for (uuid, stroke) in strokes {
                 var se = Airpdf_V1_StrokeEntry()
@@ -265,7 +230,6 @@ final class AppModel: ObservableObject {
                 page.addAnnotation(att)
             }
 
-            // Stamp annotations for visual fidelity
             for (_, stroke) in strokes {
                 if let ann = StrokeAnnotationLayer.makeSaveAnnotation(stroke: stroke, page: page) {
                     page.addAnnotation(ann)
@@ -283,14 +247,13 @@ final class AppModel: ObservableObject {
         }
         do {
             try pdfData.write(to: session.fileURL, options: .atomic)
-            session.savedUndoIndex = session.undoIndex
+            session.model.markSaved()
             objectWillChange.send()
             logger.info("saveSelectedPDF: success → \(session.fileURL.path)")
         } catch {
             logger.error("saveSelectedPDF: write failed: \(error)")
         }
 
-        // Remove save-time stamps, restore live annotations
         for i in 0..<session.pdfDocument.pageCount {
             guard let page = session.pdfDocument.page(at: i) else { continue }
             page.annotations.filter { $0.type == "Stamp" }.forEach { page.removeAnnotation($0) }

@@ -24,6 +24,9 @@ struct PDFCanvasView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ vc: DrawingViewController, context: Context) {
         vc.onStrokeDelta = onStrokeDelta
+        if vc.currentDocId != doc.id {
+            vc.loadDocument(doc)
+        }
     }
 }
 
@@ -31,6 +34,7 @@ struct PDFCanvasView: UIViewControllerRepresentable {
 
 final class DrawingViewController: UIViewController {
     var onStrokeDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
+    private(set) var currentDocId: String?
 
     private let pdfView = PDFView()
     private let toolPicker: PKToolPicker = {
@@ -50,11 +54,23 @@ final class DrawingViewController: UIViewController {
 
     override var canBecomeFirstResponder: Bool { true }
 
+    /// Register one undo action on the VC's undoManager.
+    /// Undo sends Undo to Mac, registers a redo.
+    /// Redo sends Redo to Mac, re-registers an undo (so the cycle continues).
     func registerUndoAction() {
         undoManager?.registerUndo(withTarget: self) { vc in
-            vc.onStrokeDelta?(.wrap(.undo({ var m = Airpdf_V1_Undo(); m.documentID = vc.overlayCoordinator.docId; return m }())))
+            vc.onStrokeDelta?(.wrap(.undo({
+                var m = Airpdf_V1_Undo()
+                m.documentID = vc.overlayCoordinator.docId
+                return m
+            }())))
             vc.undoManager?.registerUndo(withTarget: vc) { vc2 in
-                vc2.onStrokeDelta?(.wrap(.redo({ var m = Airpdf_V1_Redo(); m.documentID = vc2.overlayCoordinator.docId; return m }())))
+                vc2.onStrokeDelta?(.wrap(.redo({
+                    var m = Airpdf_V1_Redo()
+                    m.documentID = vc2.overlayCoordinator.docId
+                    return m
+                }())))
+                vc2.registerUndoAction()
             }
         }
     }
@@ -86,26 +102,21 @@ final class DrawingViewController: UIViewController {
 
     func loadDocument(_ doc: TabDocument) {
         overlayCoordinator.reset()
-        undoManager?.removeAllActions()
+        undoManager?.removeAllActions(withTarget: self)
+        currentDocId = doc.id
         guard isViewLoaded else { pendingDoc = doc; return }
         applyDocument(doc)
     }
 
-    func applyRemoteStrokeRemove(pageIndex: Int, strokeIds: [String]) {
-        overlayCoordinator.applyRemoteStrokeRemove(pageIndex: pageIndex, strokeIds: strokeIds)
-    }
-
-    func applyRemoteStrokeBatch(pageIndex: Int, entries: [(id: UUID, stroke: PKStroke)]) {
-        overlayCoordinator.applyRemoteStrokeBatch(pageIndex: pageIndex, entries: entries)
-    }
-
-    func applyRemoteDrawingUpdate(pageIndex: Int, entries: [(id: UUID, stroke: PKStroke)]) {
-        overlayCoordinator.applyRemoteDrawingUpdate(pageIndex: pageIndex, entries: entries)
+    /// Apply a full snapshot from DrawingsUpdate. Rebuilds annotations from model.
+    func applySnapshot(_ strokes: [(id: UUID, page: Int, stroke: PKStroke)]) {
+        overlayCoordinator.applySnapshot(strokes)
     }
 
     private func applyDocument(_ doc: TabDocument) {
+        let strokes = StrokeModel.decodePageStrokes(doc.pageStrokesProto)
         overlayCoordinator.configure(
-            docId: doc.id, pageStrokes: doc.pageStrokes, toolPicker: toolPicker,
+            docId: doc.id, initialStrokes: strokes, toolPicker: toolPicker,
             onStrokeDelta: { [weak self] env in self?.onStrokeDelta?(env) }
         )
         overlayCoordinator.onNeedsFirstResponder = { [weak self] in self?.becomeFirstResponder() }
@@ -133,12 +144,9 @@ extension DrawingViewController: PKToolPickerObserver {
 final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
 
     private var pageToViewMapping: [PDFPage: PKCanvasView] = [:]
-    /// Canonical stroke list per page — source of truth for annotations.
-    private var pageStrokes: [Int: [(id: UUID, stroke: PKStroke)]] = [:]
+    let model = StrokeModel()
     private var differs: [Int: StrokeDiffer] = [:]
     private var annotationLayers: [Int: StrokeAnnotationLayer] = [:]
-    /// Strokes committed to annotations (authoritative for edit mode restore).
-    private var committedStrokes: [Int: [(id: UUID, stroke: PKStroke)]] = [:]
     private(set) var isEditMode = false
     private var pendingEditSetup: [Int: [(id: UUID, stroke: PKStroke)]] = [:]
 
@@ -150,10 +158,10 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
     var onStrokeCommitted: (() -> Void)?
     var activeCanvases: [PKCanvasView] { Array(pageToViewMapping.values) }
 
-    func configure(docId: String, pageStrokes: [Int: [(id: UUID, stroke: PKStroke)]],
+    func configure(docId: String, initialStrokes: [(id: UUID, page: Int, stroke: PKStroke)],
                    toolPicker: PKToolPicker, onStrokeDelta: @escaping (Airpdf_V1_SyncEnvelope) -> Void) {
         self.docId = docId
-        self.pageStrokes = pageStrokes
+        model.replaceAll(with: initialStrokes)
         self.toolPicker = toolPicker
         self.onStrokeDelta = onStrokeDelta
     }
@@ -162,43 +170,67 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         for layer in annotationLayers.values { layer.removeAll() }
         pageToViewMapping = [:]
         differs = [:]
-        pageStrokes = [:]
         annotationLayers = [:]
-        committedStrokes = [:]
         pendingEditSetup = [:]
         isEditMode = false
+        model.clear()
     }
 
-    private func pdfPage(for pageIndex: Int) -> PDFPage? {
-        pageToViewMapping.keys.first { page in
-            page.document.map { $0.index(for: page) == pageIndex } ?? false
+    // MARK: - Stroke commit (from StrokeDiffer after pen lift)
+
+    func commitNewStrokes(pageIndex: Int, newStrokes: [(id: UUID, stroke: PKStroke)]) {
+        guard !isEditMode else { return }
+        model.addStrokes(newStrokes.map { (id: $0.id, page: pageIndex, stroke: $0.stroke) })
+        if let layer = annotationLayer(for: pageIndex) {
+            for (id, stroke) in newStrokes { layer.addStroke(id: id.uuidString, stroke: stroke) }
         }
-    }
-
-    private func annotationLayer(for pageIndex: Int) -> StrokeAnnotationLayer? {
-        if let existing = annotationLayers[pageIndex] { return existing }
-        guard let page = pdfPage(for: pageIndex) else { return nil }
-        let layer = StrokeAnnotationLayer(page: page)
-        annotationLayers[pageIndex] = layer
-        return layer
-    }
-
-    func commitStrokesToAnnotations(pageIndex: Int, newStrokes: [(id: UUID, stroke: PKStroke)]) {
-        guard !isEditMode, let layer = annotationLayer(for: pageIndex) else { return }
-        logger.info("commitStrokesToAnnotations page \(pageIndex): \(newStrokes.count) strokes")
-        for (id, stroke) in newStrokes { layer.addStroke(id: id.uuidString, stroke: stroke) }
-        let all = (committedStrokes[pageIndex] ?? []) + newStrokes
-        committedStrokes[pageIndex] = all
-        pageStrokes[pageIndex] = all
         differs[pageIndex]?.clearKnown()
         clearCanvas(pageIndex: pageIndex)
         onStrokeCommitted?()
     }
 
-    func removeStrokeAnnotations(pageIndex: Int, ids: Set<String>) {
-        committedStrokes[pageIndex]?.removeAll { ids.contains($0.id.uuidString) }
-        pageStrokes[pageIndex] = committedStrokes[pageIndex] ?? []
-        if !isEditMode { annotationLayers[pageIndex]?.removeStrokes(ids: ids) }
+    func handleStrokesRemoved(pageIndex: Int, ids: Set<UUID>) {
+        model.removeStrokes(ids: ids)
+        if !isEditMode {
+            annotationLayers[pageIndex]?.removeStrokes(ids: Set(ids.map { $0.uuidString }))
+        }
+    }
+
+    // MARK: - Remote snapshot (DrawingsUpdate from Mac)
+
+    func applySnapshot(_ strokes: [(id: UUID, page: Int, stroke: PKStroke)]) {
+        model.replaceAll(with: strokes)
+        rebuildAllAnnotations()
+    }
+
+    private func rebuildAllAnnotations() {
+        // Remove all existing annotations
+        for layer in annotationLayers.values { layer.removeAll() }
+        annotationLayers.removeAll()
+
+        // Rebuild from model for all visible pages
+        var pagesToInvalidate: [(PDFPage, Int)] = []
+        for (page, _) in pageToViewMapping {
+            guard let doc = page.document else { continue }
+            let idx = doc.index(for: page)
+            let layer = StrokeAnnotationLayer(page: page)
+            annotationLayers[idx] = layer
+            for (id, stroke) in model.activeStrokes(forPage: idx) {
+                layer.addStroke(id: id.uuidString, stroke: stroke)
+            }
+            differs[idx]?.clearKnown()
+            pagesToInvalidate.append((page, idx))
+        }
+
+        // Page re-insert to force visual refresh
+        let scrollView = pdfViewRef?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView
+        let savedOffset = scrollView?.contentOffset
+        for (page, idx) in pagesToInvalidate {
+            guard let doc = page.document else { continue }
+            doc.removePage(at: idx); doc.insert(page, at: idx)
+        }
+        if let savedOffset { scrollView?.contentOffset = savedOffset }
+        onNeedsFirstResponder?()
     }
 
     // MARK: - Edit mode
@@ -210,7 +242,8 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         for (page, _) in pageToViewMapping {
             guard let doc = page.document else { continue }
             let idx = doc.index(for: page)
-            guard let strokes = committedStrokes[idx], !strokes.isEmpty else { continue }
+            let strokes = model.activeStrokes(forPage: idx)
+            guard !strokes.isEmpty else { continue }
             annotationLayers[idx]?.removeAll()
             pendingEditSetup[idx] = strokes
             pagesToInvalidate.append((page, idx))
@@ -233,13 +266,12 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
             guard let doc = page.document else { continue }
             let idx = doc.index(for: page)
             guard let differ = differs[idx] else { continue }
-            let surviving = differ.knownStrokes
-            committedStrokes[idx] = surviving
-            pageStrokes[idx] = surviving
+            // Surviving strokes after edit are already tracked in model via handleStrokesRemoved
             if let layer = annotationLayer(for: idx) {
-                for (id, stroke) in surviving { layer.addStroke(id: id.uuidString, stroke: stroke) }
+                for (id, stroke) in model.activeStrokes(forPage: idx) {
+                    layer.addStroke(id: id.uuidString, stroke: stroke)
+                }
             }
-            differ.isEditMode = false
             differ.clearKnown()
             canvas.delegate = nil; canvas.drawing = PKDrawing(); canvas.delegate = differ
         }
@@ -253,47 +285,20 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         }
     }
 
-    // MARK: - Remote updates
+    // MARK: - Helpers
 
-    func applyRemoteDrawingUpdate(pageIndex: Int, entries: [(id: UUID, stroke: PKStroke)]) {
-        committedStrokes[pageIndex] = entries
-        pageStrokes[pageIndex] = entries
-        differs[pageIndex]?.clearKnown()
-        annotationLayers[pageIndex]?.removeAll()
-        annotationLayers.removeValue(forKey: pageIndex)
-        guard let page = pdfPage(for: pageIndex) else { return }
+    private func pdfPage(for pageIndex: Int) -> PDFPage? {
+        pageToViewMapping.keys.first { page in
+            page.document.map { $0.index(for: page) == pageIndex } ?? false
+        }
+    }
+
+    private func annotationLayer(for pageIndex: Int) -> StrokeAnnotationLayer? {
+        if let existing = annotationLayers[pageIndex] { return existing }
+        guard let page = pdfPage(for: pageIndex) else { return nil }
         let layer = StrokeAnnotationLayer(page: page)
         annotationLayers[pageIndex] = layer
-        for (id, stroke) in entries { layer.addStroke(id: id.uuidString, stroke: stroke) }
-        guard let doc = page.document else { return }
-        let scrollView = pdfViewRef?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView
-        let savedOffset = scrollView?.contentOffset
-        let idx = doc.index(for: page)
-        doc.removePage(at: idx); doc.insert(page, at: idx)
-        if let savedOffset { scrollView?.contentOffset = savedOffset }
-        onNeedsFirstResponder?()
-    }
-
-    func applyRemoteStrokeRemove(pageIndex: Int, strokeIds: [String]) {
-        guard differs[pageIndex] != nil else { return }
-        removeStrokeAnnotations(pageIndex: pageIndex, ids: Set(strokeIds))
-    }
-
-    func applyRemoteStrokeBatch(pageIndex: Int, entries: [(id: UUID, stroke: PKStroke)]) {
-        if differs[pageIndex] == nil {
-            let d = StrokeDiffer(pageIndex: pageIndex, documentId: docId, baseline: [])
-            d.onDelta = { [weak self] env in self?.onStrokeDelta?(env) }
-            d.onStrokesAdded = { [weak self] pi, ns in self?.commitStrokesToAnnotations(pageIndex: pi, newStrokes: ns) }
-            d.onStrokesRemoved = { [weak self] pi, ids in self?.removeStrokeAnnotations(pageIndex: pi, ids: ids) }
-            differs[pageIndex] = d
-        }
-        var existing = committedStrokes[pageIndex] ?? []
-        existing.append(contentsOf: entries)
-        committedStrokes[pageIndex] = existing
-        pageStrokes[pageIndex] = existing
-        if let layer = annotationLayer(for: pageIndex) {
-            for (id, stroke) in entries { layer.addStroke(id: id.uuidString, stroke: stroke) }
-        }
+        return layer
     }
 
     // MARK: - PDFPageOverlayViewProvider
@@ -304,7 +309,6 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         pdfViewRef = view
 
         if let existing = pageToViewMapping[page] {
-            logger.info("overlayViewFor page \(idx): returning cached canvas")
             return existing
         }
 
@@ -315,42 +319,19 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         canvas.overrideUserInterfaceStyle = .light
         if let tool = toolPicker?.selectedTool { canvas.tool = tool }
 
-        let baseline = pageStrokes[idx] ?? []
         let differ: StrokeDiffer
         if let existing = differs[idx] {
             differ = existing
         } else {
-            differ = StrokeDiffer(pageIndex: idx, documentId: docId, baseline: baseline)
+            differ = StrokeDiffer(pageIndex: idx, documentId: docId)
             differ.onDelta = { [weak self] env in self?.onStrokeDelta?(env) }
             differs[idx] = differ
         }
-        differ.onStrokesAdded = { [weak self] pi, ns in self?.commitStrokesToAnnotations(pageIndex: pi, newStrokes: ns) }
-        differ.onStrokesRemoved = { [weak self] pi, ids in self?.removeStrokeAnnotations(pageIndex: pi, ids: ids) }
-        // Delegate assigned after setup to prevent spurious delta from PDFKit firing
-        // canvasViewDrawingDidChange on canvas insertion while known != canvas stroke count.
-
-        if annotationLayers[idx] == nil && pendingEditSetup[idx] == nil {
-            let layer = StrokeAnnotationLayer(page: page)
-            annotationLayers[idx] = layer
-            let strokes = differ.knownStrokes
-            committedStrokes[idx] = strokes
-            // If eraser/lasso already active on load, go straight to edit mode
-            let currentToolNeedsEdit = toolPicker.map {
-                $0.selectedToolItem is PKToolPickerEraserItem || $0.selectedToolItem is PKToolPickerLassoItem
-            } ?? false
-            if currentToolNeedsEdit && !strokes.isEmpty {
-                isEditMode = true
-                pendingEditSetup[idx] = strokes
-                // Don't add annotations — edit mode uses canvas directly
-            } else {
-                for (id, stroke) in strokes { layer.addStroke(id: id.uuidString, stroke: stroke) }
-                differ.clearKnown()
-            }
-        } else if pendingEditSetup[idx] == nil {
-            differ.clearKnown()
-        }
+        differ.onStrokesAdded = { [weak self] pi, ns in self?.commitNewStrokes(pageIndex: pi, newStrokes: ns) }
+        differ.onStrokesRemoved = { [weak self] pi, ids in self?.handleStrokesRemoved(pageIndex: pi, ids: ids) }
 
         if let editStrokes = pendingEditSetup.removeValue(forKey: idx) {
+            // Edit mode: put strokes on canvas for PencilKit tools to operate on
             canvas.drawing = PKDrawing(strokes: editStrokes.map { $0.stroke })
             let canvasStrokes = canvas.drawing.strokes
             let paired: [(id: UUID, stroke: PKStroke)]
@@ -360,14 +341,39 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
                 paired = editStrokes
             }
             differ.restoreKnown(paired)
-            differ.isEditMode = true
+        } else if annotationLayers[idx] == nil {
+            // First time seeing this page — build annotations from model
+            let layer = StrokeAnnotationLayer(page: page)
+            annotationLayers[idx] = layer
+            let strokes = model.activeStrokes(forPage: idx)
+            // If eraser/lasso already active, go straight to edit mode
+            let currentToolNeedsEdit = toolPicker.map {
+                $0.selectedToolItem is PKToolPickerEraserItem || $0.selectedToolItem is PKToolPickerLassoItem
+            } ?? false
+            if currentToolNeedsEdit && !strokes.isEmpty {
+                isEditMode = true
+                canvas.drawing = PKDrawing(strokes: strokes.map { $0.stroke })
+                let canvasStrokes = canvas.drawing.strokes
+                let paired: [(id: UUID, stroke: PKStroke)]
+                if canvasStrokes.count == strokes.count {
+                    paired = zip(strokes, canvasStrokes).map { ($0.0.id, $0.1) }
+                } else {
+                    paired = strokes
+                }
+                differ.restoreKnown(paired)
+            } else {
+                for (id, stroke) in strokes { layer.addStroke(id: id.uuidString, stroke: stroke) }
+                differ.clearKnown()
+            }
+        } else {
+            // Annotation layer already exists (e.g. page re-insert for visual refresh)
+            differ.clearKnown()
         }
 
         canvas.delegate = differ
-
         toolPicker?.addObserver(canvas)
         pageToViewMapping[page] = canvas
-        logger.info("overlayViewFor page \(idx): created canvas, \(differ.knownStrokes.count) strokes as annotations")
+        logger.info("overlayViewFor page \(idx): created canvas")
         return canvas
     }
 
@@ -380,112 +386,74 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
     }
 }
 
-// MARK: - Stroke differ
+// MARK: - Stroke differ (simplified: always uses randomSeed)
 
 final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
     let pageIndex: Int
     let documentId: String
     var onDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
     var onStrokesAdded: ((_ pageIndex: Int, _ newStrokes: [(id: UUID, stroke: PKStroke)]) -> Void)?
-    var onStrokesRemoved: ((_ pageIndex: Int, _ removedIds: Set<String>) -> Void)?
-    var isEditMode = false
+    var onStrokesRemoved: ((_ pageIndex: Int, _ removedIds: Set<UUID>) -> Void)?
 
-    private var known: [(id: UUID, stroke: PKStroke)] = []
-    var knownStrokes: [(id: UUID, stroke: PKStroke)] { known }
+    /// randomSeed → (UUID, PKStroke) mapping. Source of truth for stroke identity.
+    private var known: [UInt32: (id: UUID, stroke: PKStroke)] = [:]
 
-    init(pageIndex: Int, documentId: String, baseline: [(id: UUID, stroke: PKStroke)]) {
+    init(pageIndex: Int, documentId: String) {
         self.pageIndex = pageIndex
         self.documentId = documentId
         super.init()
-        known = baseline
     }
 
-    func clearKnown() { known = [] }
+    func clearKnown() { known = [:] }
 
     func restoreKnown(_ strokes: [(id: UUID, stroke: PKStroke)]) {
-        known = strokes
+        known = [:]
+        for (id, stroke) in strokes {
+            known[stroke.randomSeed] = (id: id, stroke: stroke)
+        }
     }
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         let current = canvasView.drawing.strokes
-        let knownCount = known.count
-        logger.info("drawingDidChange page \(self.pageIndex): current=\(current.count) known=\(knownCount)")
+        let currentSeeds = Set(current.map { $0.randomSeed })
+        let knownSeeds = Set(known.keys)
 
-        if current.count > knownCount {
-            var batch = Airpdf_V1_StrokeBatch()
-            batch.documentID = documentId; batch.pageIndex = UInt32(pageIndex)
-            var newStrokes: [(id: UUID, stroke: PKStroke)] = []
-            for stroke in current[knownCount...] {
-                let uuid = UUID()
-                known.append((uuid, stroke))
-                newStrokes.append((uuid, stroke))
-                var entry = Airpdf_V1_StrokeEntry()
-                entry.strokeID = uuid.uuidString
-                entry.pkStrokeData = (try? PKDrawing(strokes: [stroke]).dataRepresentation()) ?? Data()
-                batch.strokes.append(entry)
-            }
-            onDelta?(.wrap(.strokeBatch(batch)))
-            onStrokesAdded?(pageIndex, newStrokes)
-
-        } else if current.count < knownCount {
-            var remaining: [(id: UUID, stroke: PKStroke)] = []
-            var removedIds: [String] = []
-            if isEditMode {
-                var knownBySeed: [UInt32: UUID] = [:]
-                for (id, stroke) in known { knownBySeed[stroke.randomSeed] = id }
-                for stroke in current {
-                    if let id = knownBySeed[stroke.randomSeed] { remaining.append((id, stroke)) }
-                }
-                let matchedIds = Set(remaining.map { $0.id })
-                for (id, _) in known where !matchedIds.contains(id) { removedIds.append(id.uuidString) }
-            } else {
-                var ci = 0
-                for (id, stroke) in known {
-                    if ci < current.count && strokesMatch(stroke, current[ci]) {
-                        remaining.append((id, current[ci])); ci += 1
-                    } else {
-                        removedIds.append(id.uuidString)
-                    }
+        // Removed strokes: in known but not in current
+        let removedSeeds = knownSeeds.subtracting(currentSeeds)
+        if !removedSeeds.isEmpty {
+            var removedIds: [UUID] = []
+            var removedIdStrings: [String] = []
+            for seed in removedSeeds {
+                if let entry = known.removeValue(forKey: seed) {
+                    removedIds.append(entry.id)
+                    removedIdStrings.append(entry.id.uuidString)
                 }
             }
-            known = remaining
-            if !removedIds.isEmpty {
-                var rm = Airpdf_V1_StrokeRemove()
-                rm.documentID = documentId; rm.pageIndex = UInt32(pageIndex); rm.strokeIds = removedIds
-                onDelta?(.wrap(.strokeRemove(rm)))
-                onStrokesRemoved?(pageIndex, Set(removedIds))
-            }
-
-        } else {
-            var changed = false
-            for i in 0..<current.count { if !strokesMatch(known[i].stroke, current[i]) { changed = true; break } }
-            guard changed else { return }
-            let oldIds = known.map { $0.id.uuidString }
             var rm = Airpdf_V1_StrokeRemove()
-            rm.documentID = documentId; rm.pageIndex = UInt32(pageIndex); rm.strokeIds = oldIds
+            rm.documentID = documentId; rm.pageIndex = UInt32(pageIndex)
+            rm.strokeIds = removedIdStrings
             onDelta?(.wrap(.strokeRemove(rm)))
-            onStrokesRemoved?(pageIndex, Set(oldIds))
+            onStrokesRemoved?(pageIndex, Set(removedIds))
+        }
+
+        // New strokes: in current but not in known
+        let newSeeds = currentSeeds.subtracting(knownSeeds)
+        if !newSeeds.isEmpty {
             var batch = Airpdf_V1_StrokeBatch()
             batch.documentID = documentId; batch.pageIndex = UInt32(pageIndex)
-            var newKnown: [(id: UUID, stroke: PKStroke)] = []
             var newStrokes: [(id: UUID, stroke: PKStroke)] = []
-            for stroke in current {
+            for stroke in current where newSeeds.contains(stroke.randomSeed) {
                 let uuid = UUID()
-                newKnown.append((uuid, stroke)); newStrokes.append((uuid, stroke))
+                known[stroke.randomSeed] = (id: uuid, stroke: stroke)
+                newStrokes.append((id: uuid, stroke: stroke))
                 var entry = Airpdf_V1_StrokeEntry()
                 entry.strokeID = uuid.uuidString
                 entry.pkStrokeData = (try? PKDrawing(strokes: [stroke]).dataRepresentation()) ?? Data()
                 batch.strokes.append(entry)
             }
             onDelta?(.wrap(.strokeBatch(batch)))
-            known = newKnown
             onStrokesAdded?(pageIndex, newStrokes)
         }
-    }
-
-    private func strokesMatch(_ a: PKStroke, _ b: PKStroke) -> Bool {
-        guard a.path.count == b.path.count && a.ink.color == b.ink.color else { return false }
-        return a.transform == b.transform
     }
 }
 #endif

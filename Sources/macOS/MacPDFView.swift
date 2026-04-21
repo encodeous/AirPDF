@@ -78,9 +78,9 @@ final class MacAnnotationCoordinator: NSObject {
 
     private func rebuildAnnotationsForPage(_ pageIdx: Int) {
         guard let layer = annotationLayer(for: pageIdx) else { return }
-        for entry in session.strokeLog[0..<session.undoIndex] where entry.page == pageIdx {
-            if !layer.strokeIds.contains(entry.id.uuidString) {
-                layer.addStroke(id: entry.id.uuidString, stroke: entry.stroke)
+        for (id, stroke) in session.model.activeStrokes(forPage: pageIdx) {
+            if !layer.strokeIds.contains(id.uuidString) {
+                layer.addStroke(id: id.uuidString, stroke: stroke)
             }
         }
     }

@@ -12,7 +12,6 @@ final class ConnectionViewModel: ObservableObject {
     let documentStore = DocumentStore()
     private let logger = Logger(subsystem: "dev.airpdf.ipad", category: "ConnectionViewModel")
 
-    /// Weak reference to the active DrawingViewController for remote stroke feedback.
     weak var activeDrawingVC: DrawingViewController?
 
     init() {
@@ -38,17 +37,6 @@ final class ConnectionViewModel: ObservableObject {
         client.send(envelope)
     }
 
-    func sendUndoRedo(undo: Bool) {
-        guard let docId = documentStore.documents.first?.id else { return }
-        if undo {
-            var msg = Airpdf_V1_Undo(); msg.documentID = docId
-            client.send(.wrap(.undo(msg)))
-        } else {
-            var msg = Airpdf_V1_Redo(); msg.documentID = docId
-            client.send(.wrap(.redo(msg)))
-        }
-    }
-
     func disconnect() {
         client.disconnectFromServer()
         documentStore.closeAll()
@@ -68,16 +56,9 @@ final class ConnectionViewModel: ObservableObject {
             break
         case .drawingsUpdate(let msg):
             logger.info("Received DrawingsUpdate from Mac: doc=\(msg.documentID) pages=\(msg.pageStrokes.count)")
-            documentStore.applyDrawingsUpdate(msg)
-            for (k, ps) in msg.pageStrokes {
-                let entries: [(id: UUID, stroke: PKStroke)] = ps.strokes.compactMap { entry in
-                    guard let uuid = UUID(uuidString: entry.strokeID),
-                          let drawing = try? PKDrawing(data: entry.pkStrokeData),
-                          let stroke = drawing.strokes.first else { return nil }
-                    return (id: uuid, stroke: stroke)
-                }
-                activeDrawingVC?.applyRemoteDrawingUpdate(pageIndex: Int(k), entries: entries)
-            }
+            // Full snapshot replace — decode and push directly to the VC's model
+            let strokes = StrokeModel.decodePageStrokes(msg.pageStrokes)
+            activeDrawingVC?.applySnapshot(strokes)
         default:
             break
         }
