@@ -265,14 +265,7 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
             pagesToInvalidate.append((page, idx))
         }
 
-        // Page re-insert to force visual refresh
-        let scrollView = pdfViewRef?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView
-        let savedOffset = scrollView?.contentOffset
-        for (page, idx) in pagesToInvalidate {
-            guard let doc = page.document else { continue }
-            doc.removePage(at: idx); doc.insert(page, at: idx)
-        }
-        if let savedOffset { scrollView?.contentOffset = savedOffset }
+        refreshVisiblePages(pagesToInvalidate)
         onNeedsFirstResponder?()
     }
 
@@ -295,23 +288,18 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         guard !isEditMode else { return }
         isEditMode = true
         var pagesToInvalidate: [(PDFPage, Int)] = []
-        for (page, _) in pageToViewMapping {
+        pendingEditSetup = [:]
+        for (page, canvas) in pageToViewMapping {
             guard let doc = page.document else { continue }
             let idx = doc.index(for: page)
             let strokes = model.activeStrokes(forPage: idx)
-            guard !strokes.isEmpty else { continue }
             annotationLayers[idx]?.removeAll()
             pendingEditSetup[idx] = strokes
+            rehydrateEditCanvas(canvas, pageIndex: idx, strokes: strokes)
             pagesToInvalidate.append((page, idx))
         }
-        let scrollView = pdfViewRef?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView
-        let savedOffset = scrollView?.contentOffset
-        for (page, _) in pagesToInvalidate {
-            guard let doc = page.document else { continue }
-            let idx = doc.index(for: page)
-            doc.removePage(at: idx); doc.insert(page, at: idx)
-        }
-        if let savedOffset { scrollView?.contentOffset = savedOffset }
+        refreshVisiblePages(pagesToInvalidate)
+        rebuildEditModeCanvases()
         onNeedsFirstResponder?()
     }
 
@@ -353,6 +341,20 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
             differ.restoreKnown(strokes)
         }
         canvas.delegate = differ
+    }
+
+    private func refreshVisiblePages(_ pages: [(PDFPage, Int)]) {
+        guard !pages.isEmpty else { return }
+        let scrollView = pdfViewRef?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView
+        let savedOffset = scrollView?.contentOffset
+        for (page, idx) in pages {
+            guard let doc = page.document else { continue }
+            doc.removePage(at: idx)
+            doc.insert(page, at: idx)
+        }
+        if let savedOffset {
+            scrollView?.contentOffset = savedOffset
+        }
     }
 
     // MARK: - Helpers
