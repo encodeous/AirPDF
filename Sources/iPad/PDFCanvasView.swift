@@ -43,7 +43,11 @@ final class DrawingViewController: UIViewController {
     var onStrokeDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
 
     private let pdfView = PDFView()
-    private let toolPicker = PKToolPicker()
+    private let toolPicker: PKToolPicker = {
+        let tp = PKToolPicker()
+        tp.overrideUserInterfaceStyle = .light
+        return tp
+    }()
     private let overlayCoordinator = OverlayCoordinator()
     private var pendingDoc: TabDocument?
 
@@ -51,6 +55,7 @@ final class DrawingViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.overrideUserInterfaceStyle = .light
 
         pdfView.autoScales = true
         pdfView.displayMode = .singlePageContinuous
@@ -157,12 +162,16 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         guard let doc = view.document else { return nil }
         let idx = doc.index(for: page)
 
-        if let existing = pageToViewMapping[page] { return existing }
+        if let existing = pageToViewMapping[page] {
+            logger.info("overlayViewFor page \(idx): returning cached canvas")
+            return existing
+        }
 
         let canvas = PKCanvasView(frame: .zero)
         canvas.drawingPolicy = .pencilOnly
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
+        canvas.overrideUserInterfaceStyle = .light
         if let tool = toolPicker?.selectedTool {
             canvas.tool = tool
         }
@@ -183,6 +192,7 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
 
         toolPicker?.addObserver(canvas)
         pageToViewMapping[page] = canvas
+        logger.info("overlayViewFor page \(idx): created canvas, delegate=\(canvas.delegate != nil)")
         return canvas
     }
 
@@ -225,6 +235,7 @@ final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         let current = canvasView.drawing.strokes
         let knownCount = known.count
+        logger.info("drawingDidChange page \(self.pageIndex): current=\(current.count) known=\(knownCount)")
 
         if current.count > knownCount {
             // New strokes appended
@@ -240,28 +251,60 @@ final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
                 batch.strokes.append(entry)
             }
             onDelta?(.wrap(.strokeBatch(batch)))
-        } else if current.count < knownCount {
-            // Strokes removed (erase / undo)
+        } else if current.count < knownCount {            // Strokes removed (erase / undo)
             var remaining: [(id: String, stroke: PKStroke)] = []
+            var removedIds: [String] = []
             var ci = 0
             for (sid, stroke) in known {
                 if ci < current.count && strokesMatch(stroke, current[ci]) {
                     remaining.append((sid, current[ci]))
                     ci += 1
                 } else {
-                    var rm = Airpdf_V1_StrokeRemove()
-                    rm.documentID = documentId
-                    rm.pageIndex = UInt32(pageIndex)
-                    rm.strokeID = sid
-                    onDelta?(.wrap(.strokeRemove(rm)))
+                    removedIds.append(sid)
                 }
             }
+            if !removedIds.isEmpty {
+                var rm = Airpdf_V1_StrokeRemove()
+                rm.documentID = documentId
+                rm.pageIndex = UInt32(pageIndex)
+                rm.strokeIds = removedIds
+                onDelta?(.wrap(.strokeRemove(rm)))
+            }
             known = remaining
+        } else {
+            // Equal count — strokes may have been modified (lasso move/transform)
+            var changed = false
+            for i in 0..<current.count {
+                if !strokesMatch(known[i].stroke, current[i]) { changed = true; break }
+            }
+            guard changed else { return }
+            var rm = Airpdf_V1_StrokeRemove()
+            rm.documentID = documentId
+            rm.pageIndex = UInt32(pageIndex)
+            rm.strokeIds = known.map { $0.id }
+            onDelta?(.wrap(.strokeRemove(rm)))
+            var batch = Airpdf_V1_StrokeBatch()
+            batch.documentID = documentId
+            batch.pageIndex = UInt32(pageIndex)
+            var newKnown: [(id: String, stroke: PKStroke)] = []
+            for stroke in current {
+                let sid = UUID().uuidString
+                newKnown.append((sid, stroke))
+                var entry = Airpdf_V1_StrokeEntry()
+                entry.strokeID = sid
+                entry.pkStrokeData = (try? PKDrawing(strokes: [stroke]).dataRepresentation()) ?? Data()
+                batch.strokes.append(entry)
+            }
+            onDelta?(.wrap(.strokeBatch(batch)))
+            known = newKnown
         }
     }
 
     private func strokesMatch(_ a: PKStroke, _ b: PKStroke) -> Bool {
-        a.path.count == b.path.count && a.ink.color == b.ink.color
+        guard a.path.count == b.path.count && a.ink.color == b.ink.color else { return false }
+        // Lasso move changes the stroke's transform, not the path points
+        if a.transform != b.transform { return false }
+        return true
     }
 }
 #endif

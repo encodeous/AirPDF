@@ -89,7 +89,7 @@ struct MacContentView: View {
     private var detailView: some View {
         if let id = appModel.selectedSessionID,
            let session = appModel.sessions.first(where: { $0.id == id }) {
-            MacPDFView(document: session.pdfDocument)
+            MacPDFView(document: session.pdfDocument, session: session)
         } else {
             ContentUnavailableView("No Document Selected", systemImage: "doc.fill",
                                    description: Text("Open a PDF to get started."))

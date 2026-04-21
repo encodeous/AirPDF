@@ -36,11 +36,11 @@ AirPDF turns an iPad into a real-time drawing tablet for marking up PDFs hosted 
 
 - [x] Phase 1: Core Networking & Discovery
 - [x] Phase 2: Document Transfer & Display
-- [ ] Phase 3: PencilKit & Drawing Sync
+- [x] Phase 3: PencilKit & Drawing Sync
 - [ ] Phase 4: Refinement & Optimization
 
-**Current phase:** Phase 2 3
-**Last worked on:** 2026-04-20
+**Current phase:** Phase 3 → 4
+**Last worked on:** 2026-04-21
 
 ### Phase 1 completion notes
 
@@ -59,6 +59,20 @@ AirPDF turns an iPad into a real-time drawing tablet for marking up PDFs hosted 
 ### Phase 2 notes
 
 The notes are in `/design/impl/phase2.md`.
+
+### Phase 3 notes
+
+The notes are in `/design/impl/phase3.md`.
+
+Key implementation details:
+- iPad uses `PDFPageOverlayViewProvider` (WWDC 2022) for per-page `PKCanvasView` overlays. PDFKit manages positioning, sizing, and recycling.
+- `PKToolPicker` anchored to the `DrawingViewController` (not canvases) — survives overlay recycling.
+- `StrokeDiffer` tracks stroke identity per page; handles add, remove, and lasso move (equal-count modification).
+- `StrokeRemove` proto changed to `repeated string stroke_ids` (field 4) for batched removals.
+- Mac display uses `PDFPageOverlayViewProvider` with `DrawingOverlayView` (`NSView` rendering `PKDrawing.image()`). Annotations only at save time.
+- `ClientConnection.onMessage` dispatched to main thread — fixes silent failures from background-thread PDFKit mutations.
+- Light mode forced on canvases (`overrideUserInterfaceStyle`), tool picker (`overrideUserInterfaceStyle`), and Mac overlays (`NSAppearance.aqua`).
+- Known limitation: `PKCanvasView` blurry on zoom (confirmed Apple framework limitation, no workaround).
 
 ## Assumptions
 
@@ -84,3 +98,9 @@ _None currently._
 | 2026-04-20 | Mac-wins reconciliation on concurrent edits |
 | 2026-04-20 | 1-minute session timeout (covers iPad backgrounding) |
 | 2026-04-20 | No PDF size limit |
+| 2026-04-21 | PDFPageOverlayViewProvider for iPad canvas overlays (WWDC 2022 pattern) |
+| 2026-04-21 | Tool picker anchored to VC, not canvases (survives overlay recycling) |
+| 2026-04-21 | Mac display via PDFPageOverlayViewProvider + DrawingOverlayView (not annotations) |
+| 2026-04-21 | StrokeRemove batched: repeated stroke_ids (field 4) |
+| 2026-04-21 | Light mode forced on canvases, tool picker, and Mac overlays |
+| 2026-04-21 | PKCanvasView zoom blur is confirmed Apple limitation — no workaround |

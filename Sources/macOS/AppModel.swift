@@ -5,6 +5,7 @@ import PDFKit
 import PencilKit
 import CryptoKit
 import SwiftUI
+import os
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -14,6 +15,7 @@ final class AppModel: ObservableObject {
 
     let server = QuicServer()
     private let store = DocumentSessionStore()
+    private let logger = Logger(subsystem: "dev.airpdf.mac", category: "AppModel")
 
     init() {
         server.onClientConnected = { [weak self] client in
@@ -123,7 +125,11 @@ final class AppModel: ObservableObject {
     private func handleMessage(_ envelope: Airpdf_V1_SyncEnvelope) {
         switch envelope.payload.body {
         case .strokeBatch(let msg):
-            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
+            logger.info("Received StrokeBatch: doc=\(msg.documentID) page=\(msg.pageIndex) strokes=\(msg.strokes.count)")
+            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else {
+                logger.error("StrokeBatch: no session for doc \(msg.documentID)")
+                return
+            }
             let pageIdx = Int(msg.pageIndex)
             let prevStrokes = currentStrokes(session: session, page: pageIdx)
             let prevMeta = session.strokeMetadata[pageIdx] ?? [:]
@@ -142,14 +148,12 @@ final class AppModel: ObservableObject {
                 guard let self else { return }
                 addedIds.forEach { session.strokeMetadata[pageIdx]?.removeValue(forKey: $0) }
                 self.updateDrawing(session: session, page: pageIdx, strokes: prevStrokes)
-                // Send StrokeRemove to iPad for each undone stroke
-                for sid in addedIds {
-                    var remove = Airpdf_V1_StrokeRemove()
-                    remove.documentID = msg.documentID
-                    remove.pageIndex = msg.pageIndex
-                    remove.strokeID = sid
-                    self.activeClient?.send(.wrap(.strokeRemove(remove)))
-                }
+                // Send StrokeRemove to iPad for undone strokes
+                var remove = Airpdf_V1_StrokeRemove()
+                remove.documentID = msg.documentID
+                remove.pageIndex = msg.pageIndex
+                remove.strokeIds = addedIds
+                self.activeClient?.send(.wrap(.strokeRemove(remove)))
                 self.objectWillChange.send()
             }
             objectWillChange.send()
@@ -157,7 +161,9 @@ final class AppModel: ObservableObject {
         case .strokeRemove(let msg):
             guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
             let pageIdx = Int(msg.pageIndex)
-            session.strokeMetadata[pageIdx]?.removeValue(forKey: msg.strokeID)
+            for sid in msg.strokeIds {
+                session.strokeMetadata[pageIdx]?.removeValue(forKey: sid)
+            }
             let remaining = Array((session.strokeMetadata[pageIdx] ?? [:]).values)
             updateDrawing(session: session, page: pageIdx, strokes: remaining)
             objectWillChange.send()
@@ -185,15 +191,8 @@ final class AppModel: ObservableObject {
     private func updateDrawing(session: DocumentSession, page: Int, strokes: [PKStroke]) {
         let drawing = PKDrawing(strokes: strokes)
         session.pageDrawings[page] = (try? drawing.dataRepresentation()) ?? Data()
-        // Render strokes as ink annotations on the PDFPage for Mac display
-        guard let pdfPage = session.pdfDocument.page(at: page) else { return }
-        // Remove existing AirPDF ink annotations
-        pdfPage.annotations.filter { $0.type == "Ink" }.forEach { pdfPage.removeAnnotation($0) }
-        // Add one ink annotation per stroke
-        for stroke in strokes {
-            let ann = PKStroke.toPDFInkAnnotation(stroke, page: pdfPage)
-            pdfPage.addAnnotation(ann)
-        }
+        session.overlayCoordinator?.refreshOverlays()
+        logger.info("updateDrawing: page \(page), \(strokes.count) strokes")
     }
 
     // MARK: - Save

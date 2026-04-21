@@ -13,6 +13,9 @@ final class DocumentSession: Identifiable, @unchecked Sendable {
     var pageDrawings: [Int: Data]       // page index → PKDrawing.dataRepresentation()
     var strokeMetadata: [Int: [String: PKStroke]] = [:] // page → strokeId → PKStroke
     let undoManager = UndoManager()
+    var needsDisplayUpdate = false
+    weak var pdfViewRef: PDFView?
+    weak var overlayCoordinator: MacOverlayCoordinator?
 
     init(fileName: String, fileURL: URL, pdfDocument: PDFDocument) {
         self.id = UUID()

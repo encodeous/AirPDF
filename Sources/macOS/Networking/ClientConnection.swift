@@ -94,7 +94,7 @@ final class ClientConnection: @unchecked Sendable {
     private func handle(_ envelope: Airpdf_V1_SyncEnvelope) {
         switch envelope.payload.body {
         case .hello(let hello): handleHello(hello)
-        default: if sessionId != nil { onMessage?(envelope) }
+        default: if sessionId != nil { DispatchQueue.main.async { self.onMessage?(envelope) } }
         }
     }
 

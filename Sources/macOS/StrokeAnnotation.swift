@@ -3,62 +3,35 @@ import PDFKit
 import PencilKit
 import AppKit
 
-extension PKStroke {
-    /// Converts a PKStroke to a PDF ink annotation with a filled outline path
-    /// that visually matches the variable-width PencilKit rendering.
-    static func toPDFInkAnnotation(_ stroke: PKStroke, page: PDFPage) -> PDFAnnotation {
-        let path = stroke.filledOutlinePath()
-        let bounds = path.bounds.insetBy(dx: -2, dy: -2)
-        let ann = PDFAnnotation(bounds: bounds, forType: .ink, withProperties: nil)
-        ann.color = NSColor(cgColor: stroke.ink.color.cgColor ?? NSColor.black.cgColor) ?? .black
-        // Translate path to annotation-local coordinates
-        let localPath = NSBezierPath()
-        let transform = AffineTransform(translationByX: -bounds.minX, byY: -bounds.minY)
-        localPath.append(path)
-        localPath.transform(using: transform)
-        ann.add(localPath)
-        return ann
+/// Renders a PKDrawing as a stamp annotation on a PDF page.
+/// Uses the WWDC 2022 approach: draw the PKDrawing image into the annotation's appearance stream.
+final class DrawingAnnotation: PDFAnnotation {
+    let drawing: PKDrawing
+
+    init(drawing: PKDrawing, bounds: CGRect) {
+        self.drawing = drawing
+        super.init(bounds: bounds, forType: .stamp, withProperties: nil)
     }
 
-    /// Builds a filled outline NSBezierPath from the stroke's variable-width path.
-    func filledOutlinePath() -> NSBezierPath {
-        let sp = self.path
-        guard sp.count > 0 else { return NSBezierPath() }
+    required init?(coder: NSCoder) { fatalError() }
 
-        var leftPoints: [CGPoint] = []
-        var rightPoints: [CGPoint] = []
+    override func draw(with box: PDFDisplayBox, in context: CGContext) {
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
 
-        let count = sp.count
-        for i in 0..<count {
-            let pt = sp.interpolatedPoint(at: CGFloat(i) / CGFloat(max(count - 1, 1)))
-            let halfW = max(pt.size.width, pt.size.height) / 2.0
-            // Compute tangent
-            let tangent: CGVector
-            if i < count - 1 {
-                let next = sp.interpolatedPoint(at: CGFloat(i + 1) / CGFloat(max(count - 1, 1)))
-                tangent = CGVector(dx: next.location.x - pt.location.x,
-                                   dy: next.location.y - pt.location.y)
-            } else if i > 0 {
-                let prev = sp.interpolatedPoint(at: CGFloat(i - 1) / CGFloat(max(count - 1, 1)))
-                tangent = CGVector(dx: pt.location.x - prev.location.x,
-                                   dy: pt.location.y - prev.location.y)
-            } else {
-                tangent = CGVector(dx: 1, dy: 0)
-            }
-            let len = sqrt(tangent.dx * tangent.dx + tangent.dy * tangent.dy)
-            let normal = len > 0 ? CGVector(dx: -tangent.dy / len, dy: tangent.dx / len) : CGVector(dx: 0, dy: 1)
-            leftPoints.append(CGPoint(x: pt.location.x + normal.dx * halfW,
-                                      y: pt.location.y + normal.dy * halfW))
-            rightPoints.append(CGPoint(x: pt.location.x - normal.dx * halfW,
-                                       y: pt.location.y - normal.dy * halfW))
-        }
+        let image = drawing.image(from: drawing.bounds, scale: 2.0)
+        image.draw(in: drawing.bounds)
 
-        let path = NSBezierPath()
-        path.move(to: leftPoints[0])
-        for p in leftPoints.dropFirst() { path.line(to: p) }
-        for p in rightPoints.reversed() { path.line(to: p) }
-        path.close()
-        return path
+        NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
+extension PKStroke {
+    /// Creates a simple stamp annotation that renders the stroke visually.
+    static func toPDFAnnotation(_ stroke: PKStroke, page: PDFPage) -> PDFAnnotation {
+        let drawing = PKDrawing(strokes: [stroke])
+        let bounds = drawing.bounds.insetBy(dx: -5, dy: -5)
+        return DrawingAnnotation(drawing: drawing, bounds: bounds)
     }
 }
 #endif

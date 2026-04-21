@@ -181,8 +181,8 @@ message StrokeRemove {
   string document_id = 1;
   // 0-based page index.
   uint32 page_index = 2;
-  // The stroke_id to remove.
-  string stroke_id = 3;
+  // The stroke_ids to remove.
+  repeated string stroke_ids = 4;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
