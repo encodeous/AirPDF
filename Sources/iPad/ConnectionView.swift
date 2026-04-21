@@ -25,31 +25,8 @@ struct ConnectionView: View {
     // MARK: - Host list
 
     private var hostListView: some View {
-        List {
-            Section("Available Macs") {
-                if vm.browser.hosts.isEmpty {
-                    Text("Searching…")
-                        .foregroundStyle(.secondary)
-                        .listRowBackground(Color.clear)
-                } else {
-                    ForEach(vm.browser.hosts) { host in
-                        Button {
-                            vm.connect(to: host)
-                        } label: {
-                            Label(host.name, systemImage: "desktopcomputer")
-                        }
-                    }
-                }
-            }
-
-            if case .failed(let reason) = vm.client.state {
-                Section {
-                    Label(reason, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.red)
-                }
-            }
-        }
-        .refreshable { /* Bonjour updates automatically */ }
+        HostListView(browser: vm.browser, onConnect: vm.connect, onConnectManual: vm.connectManual,
+                     failureReason: { if case .failed(let r) = vm.client.state { return r }; return nil }())
     }
 
     // MARK: - Connecting
@@ -79,6 +56,59 @@ struct ConnectionView: View {
             Button("Disconnect") { vm.disconnect() }
                 .buttonStyle(.bordered)
                 .tint(.red)
+        }
+    }
+}
+private struct HostListView: View {
+    @ObservedObject var browser: BonjourBrowser
+    let onConnect: (BonjourBrowser.DiscoveredHost) -> Void
+    let onConnectManual: (String, UInt16) -> Void
+    let failureReason: String?
+
+    @State private var manualHost = ""
+    @State private var manualPort = "\(AirPDFConstants.serverPort)"
+    @State private var showManual = false
+
+    var body: some View {
+        List {
+            Section("Available Macs") {
+                if browser.hosts.isEmpty {
+                    Text("Searching…")
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(browser.hosts) { host in
+                        Button {
+                            onConnect(host)
+                        } label: {
+                            Label(host.name, systemImage: "desktopcomputer")
+                        }
+                    }
+                }
+            }
+
+            Section {
+                DisclosureGroup("Connect manually", isExpanded: $showManual) {
+                    TextField("IP Address", text: $manualHost)
+                        .keyboardType(.numbersAndPunctuation)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    TextField("Port", text: $manualPort)
+                        .keyboardType(.numberPad)
+                    Button("Connect") {
+                        let port = UInt16(manualPort) ?? AirPDFConstants.serverPort
+                        onConnectManual(manualHost, port)
+                    }
+                    .disabled(manualHost.isEmpty)
+                }
+            }
+
+            if let reason = failureReason {
+                Section {
+                    Label(reason, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.red)
+                }
+            }
         }
     }
 }

@@ -41,12 +41,22 @@ struct MacContentView: View {
 
     @ViewBuilder
     private var serverStatusView: some View {
-        switch appModel.server.state {
+        ServerStatusView(server: appModel.server, onStart: { appModel.startServer() })
+    }
+}
+
+private struct ServerStatusView: View {
+    @ObservedObject var server: QuicServer
+    var onStart: () -> Void
+
+    var body: some View {
+        let _ = print("[UI] serverStatusView rendering, state=\(server.state)")
+        switch server.state {
         case .stopped:
             HStack {
                 Circle().fill(.red).frame(width: 8, height: 8)
                 Text("Server stopped")
-                Button("Start") { appModel.startServer() }.buttonStyle(.borderedProminent)
+                Button("Start", action: onStart).buttonStyle(.borderedProminent)
             }
         case .running(let port):
             HStack {

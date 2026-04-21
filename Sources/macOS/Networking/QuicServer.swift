@@ -18,7 +18,6 @@ final class QuicServer: ObservableObject {
 
     private var listener: NWListener?
     private var activeClient: ClientConnection?
-    private var bonjourService: NWListener?
     private let queue = DispatchQueue(label: "dev.airpdf.mac.quic", qos: .userInitiated)
     private let logger = Logger(subsystem: "dev.airpdf.mac", category: "QuicServer")
 
@@ -68,8 +67,8 @@ final class QuicServer: ObservableObject {
                 }
             }
         }
+        advertiseBonjour(on: listener)
         listener.start(queue: queue)
-        advertiseBonjour()
     }
 
     func stop() {
@@ -77,8 +76,6 @@ final class QuicServer: ObservableObject {
         activeClient = nil
         listener?.cancel()
         listener = nil
-        bonjourService?.cancel()
-        bonjourService = nil
         state = .stopped
     }
 
@@ -113,11 +110,22 @@ final class QuicServer: ObservableObject {
 
     // MARK: - Bonjour
 
-    private func advertiseBonjour() {
-        listener?.service = NWListener.Service(
-            name: Host.current().localizedName ?? "AirPDF Mac",
+    private func advertiseBonjour(on listener: NWListener) {
+        let serviceName = Host.current().localizedName ?? "AirPDF Mac"
+        listener.service = NWListener.Service(
+            name: serviceName,
             type: AirPDFConstants.bonjourServiceType
         )
+        listener.serviceRegistrationUpdateHandler = { change in
+            switch change {
+            case .add(let endpoint):
+                self.logger.info("Bonjour registered: \(String(describing: endpoint))")
+            case .remove(let endpoint):
+                self.logger.info("Bonjour removed: \(String(describing: endpoint))")
+            @unknown default: break
+            }
+        }
+        logger.info("Advertising Bonjour service '\(serviceName)' as \(AirPDFConstants.bonjourServiceType)")
     }
 }
 #endif

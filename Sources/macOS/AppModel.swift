@@ -63,8 +63,11 @@ final class AppModel: ObservableObject {
 
     func startServer() {
         do {
+            print("[AppModel] startServer called, current state=\(server.state)")
             try server.start()
+            print("[AppModel] server.start() returned, state=\(server.state)")
         } catch {
+            print("[AppModel] server.start() threw: \(error)")
             lastError = error.localizedDescription
         }
     }
