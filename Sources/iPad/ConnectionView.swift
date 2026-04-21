@@ -45,7 +45,7 @@ private struct ConnectedSessionView: View {
     @State private var showConnectionInfo = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .bottomTrailing) {
             PDFTabView(store: vm.documentStore, onStrokeDelta: { vm.send($0) },
                        onVCReady: { [weak vm] vc in vm?.activeDrawingVC = vc })
 
@@ -58,9 +58,9 @@ private struct ConnectedSessionView: View {
                     .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
             }
             .buttonStyle(.plain)
-            .padding(.top, 12)
             .padding(.trailing, 16)
-            .popover(isPresented: $showConnectionInfo, arrowEdge: .top) {
+            .padding(.bottom, 20)
+            .popover(isPresented: $showConnectionInfo, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Mac connected").bold()
                     Divider()
@@ -84,6 +84,7 @@ private struct ConnectedSessionView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .statusBarHidden(true)
     }
 }
 
