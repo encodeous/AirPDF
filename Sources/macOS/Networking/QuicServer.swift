@@ -32,6 +32,7 @@ final class QuicServer: ObservableObject {
 
         let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
         quicOptions.direction = .bidirectional
+        quicOptions.idleTimeout = 30 * 1000 // 30 seconds
         sec_protocol_options_set_local_identity(
             quicOptions.securityProtocolOptions,
             identity.secIdentity

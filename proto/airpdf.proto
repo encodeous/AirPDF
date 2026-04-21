@@ -10,7 +10,8 @@ package airpdf.v1;
 // Discovery: Bonjour service type "_airpdf._udp".
 // Framing: Each message on the wire is a length-prefixed SyncEnvelope.
 // Ordering: Strict FIFO — one stream guarantees no out-of-order delivery.
-// Liveness: QUIC transport-level keepalive (no application-level heartbeat).
+// Liveness: iPad sends Heartbeat every 5 s to keep the QUIC connection alive.
+//           Mac silently ignores Heartbeat messages.
 // Single client: v1 supports exactly one connected iPad at a time.
 //
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -33,6 +34,11 @@ message Payload {
     // Mac → iPad: reply to Hello. Followed immediately by PdfData for every
     // currently-open document so the iPad can restore full session state.
     Welcome welcome = 2;
+
+    // ── Connectivity ────────────────────────────────────────────────────────
+    // iPad → Mac: sent every 30 s to keep the QUIC connection alive.
+    // Mac silently ignores this message.
+    Heartbeat heartbeat = 3;
 
     // ── Document lifecycle ──────────────────────────────────────────────────
     // Mac → iPad: open or replace a document tab.
@@ -89,6 +95,14 @@ message Welcome {
   // the Mac will re-deliver PdfData for every open document immediately after.
   string session_id = 2;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Connectivity
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// iPad → Mac: sent every 30 s to keep the QUIC connection alive.
+// The Mac silently ignores this message.
+message Heartbeat {}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Document Lifecycle
@@ -240,7 +254,8 @@ enum ErrorCode {
 // ═══════════════════════════════════════════════════════════════════════════════
 //
 // Bonjour service type:       "_airpdf._udp"
-// Session timeout:            1 minute (QUIC keepalive idle timeout)
+// Session timeout:            30 seconds
+// Heartbeat interval:         5 seconds
 // Max concurrent clients:     1
 // PKDrawing attachment name:  "airpdf_drawing.pkdata" (per-page file attachment)
 //

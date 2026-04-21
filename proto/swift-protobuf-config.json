@@ -1,0 +1,8 @@
+{
+  "invocations": [
+    {
+      "protoFiles": ["airpdf.proto"],
+      "visibility": "internal"
+    }
+  ]
+}

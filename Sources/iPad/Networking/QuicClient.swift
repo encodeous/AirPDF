@@ -27,6 +27,7 @@ final class QuicClient: ObservableObject {
 
     private var receiveBuffer = Data()
     private var lastSessionId: String?
+    private var keepaliveTimer: DispatchSourceTimer?
 
     init() {}
 
@@ -102,6 +103,18 @@ final class QuicClient: ObservableObject {
         lastSessionId = sid
         state = .connected(sessionId: sid)
         logger.info("Connected, session=\(sid)")
+        startKeepalive()
+    }
+
+    private func startKeepalive() {
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 5, repeating: 5)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in self.send(.wrap(.heartbeat(Airpdf_V1_Heartbeat()))) }
+        }
+        timer.resume()
+        keepaliveTimer = timer
     }
 
     // MARK: - Receive loop
@@ -145,6 +158,8 @@ final class QuicClient: ObservableObject {
     // MARK: - Teardown
 
     private func teardown(reason: String?) {
+        keepaliveTimer?.cancel()
+        keepaliveTimer = nil
         connection?.cancel()
         connection = nil
         receiveBuffer = Data()
