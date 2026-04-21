@@ -31,7 +31,8 @@ private struct ClientStateView: View {
                         .buttonStyle(.bordered)
                 }
             case .connected:
-                PDFTabView(store: vm.documentStore, onStrokeDelta: { vm.send($0) })
+                PDFTabView(store: vm.documentStore, onStrokeDelta: { vm.send($0) },
+                           onVCReady: { [weak vm] vc in vm?.activeDrawingVC = vc })
                     .navigationTitle("")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -43,11 +44,7 @@ private struct ClientStateView: View {
                             .font(.caption2).monospaced().foregroundStyle(.secondary)
                         }
                         ToolbarItem(placement: .topBarTrailing) {
-                            HStack {
-                                Button("Undo") { vm.sendUndoRedo(undo: true) }
-                                Button("Redo") { vm.sendUndoRedo(undo: false) }
-                                Button("Disconnect", role: .destructive) { vm.disconnect() }
-                            }
+                            Button("Disconnect", role: .destructive) { vm.disconnect() }
                         }
                     }
             }
@@ -62,7 +59,7 @@ private struct HostListView: View {
     let failureReason: String?
 
     @State private var manualHost = ""
-    @State private var manualPort = "\(AirPDFConstants.serverPort)"
+    @State private var manualPort = ""
     @State private var showManual = false
 
     var body: some View {
@@ -73,7 +70,12 @@ private struct HostListView: View {
                 } else {
                     ForEach(browser.hosts) { host in
                         Button { onConnect(host) } label: {
-                            Label(host.name, systemImage: "desktopcomputer")
+                            let duplicateName = browser.hosts.filter { $0.name == host.name }.count > 1
+                            if duplicateName, let port = host.port {
+                                Label("\(host.name) :\(port)", systemImage: "desktopcomputer")
+                            } else {
+                                Label(host.name, systemImage: "desktopcomputer")
+                            }
                         }
                     }
                 }
@@ -86,10 +88,10 @@ private struct HostListView: View {
                         .textInputAutocapitalization(.never)
                     TextField("Port", text: $manualPort).keyboardType(.numberPad)
                     Button("Connect") {
-                        let port = UInt16(manualPort) ?? AirPDFConstants.serverPort
+                        guard let port = UInt16(manualPort) else { return }
                         onConnectManual(manualHost, port)
                     }
-                    .disabled(manualHost.isEmpty)
+                    .disabled(manualHost.isEmpty || UInt16(manualPort) == nil)
                 }
             }
             if let reason = failureReason {

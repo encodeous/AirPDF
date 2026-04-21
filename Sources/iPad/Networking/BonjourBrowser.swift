@@ -10,12 +10,14 @@ final class BonjourBrowser: ObservableObject {
     @Published private(set) var hosts: [DiscoveredHost] = []
 
     private var browser: NWBrowser?
+    private var resolvers: [String: NWConnection] = [:]
     private let queue = DispatchQueue(label: "dev.airpdf.ipad.bonjour", qos: .userInitiated)
     private let logger = Logger(subsystem: "dev.airpdf.ipad", category: "BonjourBrowser")
 
     struct DiscoveredHost: Identifiable, Equatable {
         let id: String // service name
         let name: String
+        let port: UInt16?
         let endpoint: NWEndpoint
     }
 
@@ -40,16 +42,29 @@ final class BonjourBrowser: ObservableObject {
             }
         }
 
-        browser.browseResultsChangedHandler = { [weak self] results, changes in
+        browser.browseResultsChangedHandler = { [weak self] results, _ in
             guard let self else { return }
             Task { @MainActor in
-                self.logger.info("Browse results changed: \(results.count) result(s), changes: \(changes.count)")
-                for result in results {
-                    self.logger.info("  Found endpoint: \(String(describing: result.endpoint))")
-                }
-                self.hosts = results.compactMap { result in
+                self.logger.info("Browse results changed: \(results.count) result(s)")
+                let current = results.compactMap { result -> DiscoveredHost? in
                     guard case .service(let name, _, _, _) = result.endpoint else { return nil }
-                    return DiscoveredHost(id: name, name: name, endpoint: result.endpoint)
+                    return DiscoveredHost(id: name, name: name, port: nil, endpoint: result.endpoint)
+                }
+                // Merge ports from any already-resolved hosts
+                self.hosts = current.map { host in
+                    if let existing = self.hosts.first(where: { $0.id == host.id }), let port = existing.port {
+                        return DiscoveredHost(id: host.id, name: host.name, port: port, endpoint: host.endpoint)
+                    }
+                    return host
+                }
+                // Cancel resolvers for removed hosts
+                let currentIds = Set(current.map(\.id))
+                for id in self.resolvers.keys where !currentIds.contains(id) {
+                    self.resolvers.removeValue(forKey: id)?.cancel()
+                }
+                // Start resolvers for new hosts without a port
+                for host in self.hosts where host.port == nil && self.resolvers[host.id] == nil {
+                    self.resolvePort(for: host)
                 }
             }
         }
@@ -59,7 +74,31 @@ final class BonjourBrowser: ObservableObject {
     func stop() {
         browser?.cancel()
         browser = nil
+        resolvers.values.forEach { $0.cancel() }
+        resolvers.removeAll()
         hosts = []
+    }
+
+    // MARK: - Port resolution
+
+    private func resolvePort(for host: DiscoveredHost) {
+        let conn = NWConnection(to: host.endpoint, using: .udp)
+        resolvers[host.id] = conn
+        conn.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            guard let remote = path.remoteEndpoint,
+                  case .hostPort(_, let port) = remote else { return }
+            Task { @MainActor in
+                self.resolvers.removeValue(forKey: host.id)?.cancel()
+                self.hosts = self.hosts.map { h in
+                    h.id == host.id
+                        ? DiscoveredHost(id: h.id, name: h.name, port: port.rawValue, endpoint: h.endpoint)
+                        : h
+                }
+                self.logger.info("Resolved port \(port.rawValue) for '\(host.name)'")
+            }
+        }
+        conn.start(queue: queue)
     }
 }
 #endif

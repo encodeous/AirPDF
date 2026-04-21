@@ -12,6 +12,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var sessions: [DocumentSession] = []
     @Published var selectedSessionID: UUID?
     @Published var lastError: String?
+    /// Session with a detected external file conflict (prompt user to reload or keep).
+    @Published var fileConflictSession: DocumentSession?
 
     let server = QuicServer()
     private let store = DocumentSessionStore()
@@ -47,6 +49,11 @@ final class AppModel: ObservableObject {
         // Push to connected iPad immediately
         if let client = activeClient {
             client.send(.wrap(.pdfData(makePdfData(for: session))))
+        }
+        // Watch for external file changes
+        session.startWatching { [weak self, weak session] in
+            guard let self, let session else { return }
+            self.handleExternalFileChange(session: session)
         }
         return true
     }
@@ -93,6 +100,13 @@ final class AppModel: ObservableObject {
         return msg
     }
 
+    private func makeDrawingsUpdate(for session: DocumentSession) -> Airpdf_V1_DrawingsUpdate {
+        var msg = Airpdf_V1_DrawingsUpdate()
+        msg.documentID = session.documentId
+        msg.pageDrawings = session.pageDrawings.reduce(into: [:]) { $0[UInt32($1.key)] = $1.value }
+        return msg
+    }
+
     // MARK: - Server
 
     func startServer() {
@@ -125,74 +139,138 @@ final class AppModel: ObservableObject {
     private func handleMessage(_ envelope: Airpdf_V1_SyncEnvelope) {
         switch envelope.payload.body {
         case .strokeBatch(let msg):
-            logger.info("Received StrokeBatch: doc=\(msg.documentID) page=\(msg.pageIndex) strokes=\(msg.strokes.count)")
-            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else {
-                logger.error("StrokeBatch: no session for doc \(msg.documentID)")
-                return
-            }
+            guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
             let pageIdx = Int(msg.pageIndex)
-            let prevStrokes = currentStrokes(session: session, page: pageIdx)
-            let prevMeta = session.strokeMetadata[pageIdx] ?? [:]
-            var strokes = prevStrokes
-            var addedIds: [String] = []
+            // Truncate any redo history above the cursor
+            session.strokeLog.removeSubrange(session.undoIndex...)
+            let insertStart = session.undoIndex
             for entry in msg.strokes {
                 guard let drawing = try? PKDrawing(data: entry.pkStrokeData),
                       let stroke = drawing.strokes.first else { continue }
-                strokes.append(stroke)
-                session.strokeMetadata[pageIdx, default: [:]][entry.strokeID] = stroke
-                addedIds.append(entry.strokeID)
+                session.strokeLog.append((id: entry.strokeID, page: pageIdx, stroke: stroke))
+                session.undoIndex += 1
             }
-            updateDrawing(session: session, page: pageIdx, strokes: strokes)
-            // Register undo
-            session.undoManager.registerUndo(withTarget: self) { [weak self] target in
-                guard let self else { return }
-                addedIds.forEach { session.strokeMetadata[pageIdx]?.removeValue(forKey: $0) }
-                self.updateDrawing(session: session, page: pageIdx, strokes: prevStrokes)
-                // Send StrokeRemove to iPad for undone strokes
-                var remove = Airpdf_V1_StrokeRemove()
-                remove.documentID = msg.documentID
-                remove.pageIndex = msg.pageIndex
-                remove.strokeIds = addedIds
-                self.activeClient?.send(.wrap(.strokeRemove(remove)))
-                self.objectWillChange.send()
-            }
+            rebuildDrawing(session: session, page: pageIdx)
             objectWillChange.send()
 
         case .strokeRemove(let msg):
             guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
             let pageIdx = Int(msg.pageIndex)
-            for sid in msg.strokeIds {
-                session.strokeMetadata[pageIdx]?.removeValue(forKey: sid)
-            }
-            let remaining = Array((session.strokeMetadata[pageIdx] ?? [:]).values)
-            updateDrawing(session: session, page: pageIdx, strokes: remaining)
+            let removeSet = Set(msg.strokeIds)
+            // Remove matching entries from the log entirely (erase is permanent, not undoable here)
+            session.strokeLog.removeAll { removeSet.contains($0.id) }
+            session.undoIndex = min(session.undoIndex, session.strokeLog.count)
+            rebuildDrawing(session: session, page: pageIdx)
             objectWillChange.send()
 
         case .undo(let msg):
             guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
-            session.undoManager.undo()
+            handleUndo(session: session)
             objectWillChange.send()
 
         case .redo(let msg):
             guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
-            session.undoManager.redo()
+            handleRedo(session: session)
             objectWillChange.send()
 
         default: break
         }
     }
 
-    private func currentStrokes(session: DocumentSession, page: Int) -> [PKStroke] {
-        guard let data = session.pageDrawings[page],
-              let drawing = try? PKDrawing(data: data) else { return [] }
-        return drawing.strokes
+    /// Rebuild pageDrawings[page] from the active portion of strokeLog (0..<undoIndex).
+    private func rebuildDrawing(session: DocumentSession, page: Int) {
+        let strokes = session.strokeLog[0..<session.undoIndex]
+            .filter { $0.page == page }
+            .map { $0.stroke }
+        updateDrawing(session: session, page: page, strokes: strokes)
+    }
+
+    func handleUndo(session: DocumentSession) {
+        guard session.undoIndex > 0 else { return }
+        session.undoIndex -= 1
+        let entry = session.strokeLog[session.undoIndex]
+        rebuildDrawing(session: session, page: entry.page)
+        var remove = Airpdf_V1_StrokeRemove()
+        remove.documentID = session.documentId
+        remove.pageIndex = UInt32(entry.page)
+        remove.strokeIds = [entry.id]
+        activeClient?.send(.wrap(.strokeRemove(remove)))
+        activeClient?.send(.wrap(.drawingsUpdate(makeDrawingsUpdate(for: session))))
+    }
+
+    func handleRedo(session: DocumentSession) {
+        guard session.undoIndex < session.strokeLog.count else { return }
+        let entry = session.strokeLog[session.undoIndex]
+        session.undoIndex += 1
+        rebuildDrawing(session: session, page: entry.page)
+        var batch = Airpdf_V1_StrokeBatch()
+        batch.documentID = session.documentId
+        batch.pageIndex = UInt32(entry.page)
+        var e = Airpdf_V1_StrokeEntry()
+        e.strokeID = entry.id
+        e.pkStrokeData = (try? PKDrawing(strokes: [entry.stroke]).dataRepresentation()) ?? Data()
+        batch.strokes = [e]
+        activeClient?.send(.wrap(.strokeBatch(batch)))
+        activeClient?.send(.wrap(.drawingsUpdate(makeDrawingsUpdate(for: session))))
     }
 
     private func updateDrawing(session: DocumentSession, page: Int, strokes: [PKStroke]) {
-        let drawing = PKDrawing(strokes: strokes)
+        let baseStrokes = session.baseDrawings[page]?.strokes ?? []
+        let drawing = PKDrawing(strokes: baseStrokes + strokes)
         session.pageDrawings[page] = (try? drawing.dataRepresentation()) ?? Data()
         session.overlayCoordinator?.refreshOverlays()
         logger.info("updateDrawing: page \(page), \(strokes.count) strokes")
+    }
+
+    // MARK: - External file change
+
+    private func handleExternalFileChange(session: DocumentSession) {
+        if session.undoIndex > 0 {
+            session.hasExternalConflict = true
+            fileConflictSession = session
+        } else {
+            reloadFromDisk(session: session)
+        }
+    }
+
+    /// Reload the document from disk, discarding in-memory changes.
+    func reloadFromDisk(session: DocumentSession) {
+        session.stopWatching()
+        session.hasExternalConflict = false
+        fileConflictSession = nil
+        guard let newDoc = PDFDocument(url: session.fileURL) else { return }
+        // Reload pkdata from new file
+        var drawings: [Int: Data] = [:]
+        for i in 0..<newDoc.pageCount {
+            guard let page = newDoc.page(at: i) else { continue }
+            for ann in page.annotations {
+                guard ann.type == "FileAttachment",
+                      ann.contents == "airpdf_drawing.pkdata",
+                      let data = ann.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/FS")) as? Data
+                else { continue }
+                drawings[i] = data
+            }
+        }
+        session.pageDrawings = drawings
+        session.baseDrawings = drawings.compactMapValues { try? PKDrawing(data: $0) }
+        session.strokeLog = []
+        session.undoIndex = 0
+        session.pdfViewRef?.document = newDoc
+        session.overlayCoordinator?.refreshOverlays()
+        // Re-send to iPad
+        if let client = activeClient {
+            client.send(.wrap(.pdfData(makePdfData(for: session))))
+        }
+        session.startWatching { [weak self, weak session] in
+            guard let self, let session else { return }
+            self.handleExternalFileChange(session: session)
+        }
+    }
+
+    /// Keep in-memory version; next save will overwrite the file.
+    func keepInMemory(session: DocumentSession) {
+        session.hasExternalConflict = false
+        fileConflictSession = nil
     }
 
     // MARK: - Save
@@ -200,22 +278,50 @@ final class AppModel: ObservableObject {
     func saveSelectedPDF() {
         guard let id = selectedSessionID,
               let session = sessions.first(where: { $0.id == id }) else { return }
-        // Attach pkdata per page
+        session.stopWatching()
+        // Attach pkdata + visible stamp per page
         for (pageIdx, drawingData) in session.pageDrawings {
             guard let page = session.pdfDocument.page(at: pageIdx) else { continue }
-            // Remove old pkdata attachment
+            // Remove old AirPDF annotations (pkdata + stamps)
             page.annotations
-                .filter { $0.type == "FileAttachment" && $0.contents == "airpdf_drawing.pkdata" }
+                .filter {
+                    ($0.type == "FileAttachment" && $0.contents == "airpdf_drawing.pkdata") ||
+                    $0.type == "Stamp"
+                }
                 .forEach { page.removeAnnotation($0) }
-            // Add new pkdata attachment
-            let ann = PDFAnnotation(bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+            // Hidden pkdata attachment (round-trip fidelity)
+            let att = PDFAnnotation(bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
                                     forType: PDFAnnotationSubtype(rawValue: "/FileAttachment"),
                                     withProperties: nil)
-            ann.contents = "airpdf_drawing.pkdata"
-            ann.setValue(drawingData, forAnnotationKey: PDFAnnotationKey(rawValue: "/FS"))
-            page.addAnnotation(ann)
+            att.contents = "airpdf_drawing.pkdata"
+            att.setValue(drawingData, forAnnotationKey: PDFAnnotationKey(rawValue: "/FS"))
+            page.addAnnotation(att)
+            // Visible stamp annotation (printable)
+            if let drawing = try? PKDrawing(data: drawingData), !drawing.strokes.isEmpty {
+                let bounds = drawing.bounds.insetBy(dx: -5, dy: -5)
+                page.addAnnotation(DrawingAnnotation(drawing: drawing, bounds: bounds))
+            }
         }
-        session.pdfDocument.write(to: session.fileURL)
+        // Write PDF data directly — PDFDocument.write preserves mtime via atomic swap internals.
+        // Using Data.write gives a fresh file with updated modification date.
+        guard let pdfData = session.pdfDocument.dataRepresentation() else {
+            logger.error("saveSelectedPDF: dataRepresentation() returned nil")
+            session.startWatching { [weak self, weak session] in
+                guard let self, let session else { return }
+                self.handleExternalFileChange(session: session)
+            }
+            return
+        }
+        do {
+            try pdfData.write(to: session.fileURL, options: .atomic)
+            logger.info("saveSelectedPDF: success → \(session.fileURL.path)")
+        } catch {
+            logger.error("saveSelectedPDF: write failed: \(error)")
+        }
+        session.startWatching { [weak self, weak session] in
+            guard let self, let session else { return }
+            self.handleExternalFileChange(session: session)
+        }
     }
 }
 #endif

@@ -61,6 +61,11 @@ message Payload {
     // ── Errors ──────────────────────────────────────────────────────────────
     // Bidirectional: signal a protocol or application error.
     Error error = 11;
+
+    // ── Drawings-only update ─────────────────────────────────────────────────
+    // Mac → iPad: update per-page drawings without re-sending PDF bytes.
+    // Sent instead of PdfData when only strokes changed (e.g. undo/redo result).
+    DrawingsUpdate drawings_update = 12;
   }
 }
 
@@ -209,6 +214,21 @@ message Undo {
 // iPad → Mac: request redo of the last undone action on the given document.
 message Redo {
   string document_id = 1;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Drawings-only Update
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Mac → iPad: update per-page drawings without re-sending PDF bytes.
+// Sent instead of PdfData when only strokes changed (e.g. undo/redo result).
+// The iPad merges the provided page_drawings into its current state and resets
+// the stroke-id baseline for each updated page.
+message DrawingsUpdate {
+  string document_id = 1;
+  // Updated per-page PKDrawing snapshots. Only pages present in this map are
+  // replaced; other pages are left unchanged.
+  map<uint32, bytes> page_drawings = 2;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

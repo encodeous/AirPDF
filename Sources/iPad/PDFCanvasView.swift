@@ -14,11 +14,13 @@ private let logger = Logger(subsystem: "dev.airpdf.ipad", category: "PDFCanvas")
 struct PDFCanvasView: UIViewControllerRepresentable {
     let doc: TabDocument
     let onStrokeDelta: (Airpdf_V1_SyncEnvelope) -> Void
+    let onVCReady: ((DrawingViewController) -> Void)?
 
     func makeUIViewController(context: Context) -> DrawingViewController {
         let vc = DrawingViewController()
         vc.onStrokeDelta = onStrokeDelta
         vc.loadDocument(doc)
+        onVCReady?(vc)
         return vc
     }
 
@@ -48,10 +50,23 @@ final class DrawingViewController: UIViewController {
         tp.overrideUserInterfaceStyle = .light
         return tp
     }()
-    private let overlayCoordinator = OverlayCoordinator()
+    let overlayCoordinator = OverlayCoordinator()
     private var pendingDoc: TabDocument?
 
     override var canBecomeFirstResponder: Bool { true }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(undo(_:)) || action == #selector(redo(_:)) { return true }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    @objc func undo(_ sender: Any?) {
+        onStrokeDelta?(.wrap(.undo({ var m = Airpdf_V1_Undo(); m.documentID = overlayCoordinator.docId; return m }())))
+    }
+
+    @objc func redo(_ sender: Any?) {
+        onStrokeDelta?(.wrap(.redo({ var m = Airpdf_V1_Redo(); m.documentID = overlayCoordinator.docId; return m }())))
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -95,6 +110,14 @@ final class DrawingViewController: UIViewController {
         applyDocument(doc)
     }
 
+    func applyRemoteStrokeRemove(pageIndex: Int, strokeIds: [String]) {
+        overlayCoordinator.applyRemoteStrokeRemove(pageIndex: pageIndex, strokeIds: strokeIds)
+    }
+
+    func applyRemoteStrokeBatch(pageIndex: Int, entries: [(id: String, stroke: PKStroke)]) {
+        overlayCoordinator.applyRemoteStrokeBatch(pageIndex: pageIndex, entries: entries)
+    }
+
     private func applyDocument(_ doc: TabDocument) {
         overlayCoordinator.configure(
             docId: doc.id,
@@ -135,7 +158,7 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
     /// because they hold stroke_id → PKStroke mapping.
     private var differs: [Int: StrokeDiffer] = [:]
 
-    private var docId = ""
+    var docId = ""
     private weak var toolPicker: PKToolPicker?
     private var onStrokeDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
 
@@ -154,6 +177,57 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         pageToViewMapping = [:]
         differs = [:]
         pageDrawings = [:]
+    }
+
+    /// Apply a remote drawing update (Mac undo/redo feedback).
+    /// Updates stored drawing data and refreshes the live canvas if visible.
+    func applyRemoteDrawingUpdate(pageIndex: Int, drawingData: Data) {
+        pageDrawings[pageIndex] = drawingData
+        guard let drawing = try? PKDrawing(data: drawingData) else { return }
+        // Find the canvas for this page index
+        for (page, canvas) in pageToViewMapping {
+            guard let doc = page.document, doc.index(for: page) == pageIndex else { continue }
+            canvas.delegate = nil  // suppress delta emission during programmatic update
+            canvas.drawing = drawing
+            differs[pageIndex]?.resetBaseline(drawing)
+            canvas.delegate = differs[pageIndex]
+            return
+        }
+        // Canvas not visible — update differ baseline so next display is correct
+        differs[pageIndex]?.resetBaseline(drawing)
+    }
+
+    /// Remove strokes by ID from the canvas (Mac undo feedback).
+    func applyRemoteStrokeRemove(pageIndex: Int, strokeIds: [String]) {
+        guard let differ = differs[pageIndex] else { return }
+        let updated = differ.removeStrokes(ids: Set(strokeIds))
+        guard let data = try? updated.dataRepresentation() else { return }
+        pageDrawings[pageIndex] = data
+        applyDrawingToCanvas(pageIndex: pageIndex, drawing: updated, differ: differ)
+    }
+
+    /// Add strokes to the canvas (Mac redo feedback).
+    func applyRemoteStrokeBatch(pageIndex: Int, entries: [(id: String, stroke: PKStroke)]) {
+        let differ = differs[pageIndex] ?? {
+            let d = StrokeDiffer(pageIndex: pageIndex, documentId: docId, baseline: PKDrawing())
+            d.onDelta = { [weak self] env in self?.onStrokeDelta?(env) }
+            differs[pageIndex] = d
+            return d
+        }()
+        let updated = differ.addStrokes(entries: entries)
+        guard let data = try? updated.dataRepresentation() else { return }
+        pageDrawings[pageIndex] = data
+        applyDrawingToCanvas(pageIndex: pageIndex, drawing: updated, differ: differ)
+    }
+
+    private func applyDrawingToCanvas(pageIndex: Int, drawing: PKDrawing, differ: StrokeDiffer) {
+        for (page, canvas) in pageToViewMapping {
+            guard let doc = page.document, doc.index(for: page) == pageIndex else { continue }
+            canvas.delegate = nil
+            canvas.drawing = drawing
+            canvas.delegate = differ
+            return
+        }
     }
 
     // MARK: PDFPageOverlayViewProvider
@@ -230,6 +304,20 @@ final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
 
     func resetBaseline(_ drawing: PKDrawing) {
         known = drawing.strokes.map { (UUID().uuidString, $0) }
+    }
+
+    /// Remove strokes by ID (Mac undo feedback). Returns the updated drawing data.
+    @discardableResult
+    func removeStrokes(ids: Set<String>) -> PKDrawing {
+        known.removeAll { ids.contains($0.id) }
+        return PKDrawing(strokes: known.map { $0.stroke })
+    }
+
+    /// Add strokes from Mac (redo feedback). Returns the updated drawing data.
+    @discardableResult
+    func addStrokes(entries: [(id: String, stroke: PKStroke)]) -> PKDrawing {
+        known.append(contentsOf: entries)
+        return PKDrawing(strokes: known.map { $0.stroke })
     }
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {

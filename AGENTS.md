@@ -37,9 +37,9 @@ AirPDF turns an iPad into a real-time drawing tablet for marking up PDFs hosted 
 - [x] Phase 1: Core Networking & Discovery
 - [x] Phase 2: Document Transfer & Display
 - [x] Phase 3: PencilKit & Drawing Sync
-- [ ] Phase 4: Refinement & Optimization
+- [x] Phase 4: Refinement & Optimization
 
-**Current phase:** Phase 3 → 4
+**Current phase:** Complete
 **Last worked on:** 2026-04-21
 
 ### Phase 1 completion notes
@@ -74,7 +74,18 @@ Key implementation details:
 - Light mode forced on canvases (`overrideUserInterfaceStyle`), tool picker (`overrideUserInterfaceStyle`), and Mac overlays (`NSAppearance.aqua`).
 - Known limitation: `PKCanvasView` blurry on zoom (confirmed Apple framework limitation, no workaround).
 
-## Assumptions
+### Phase 4 notes
+
+The notes are in `/design/impl/phase4.md`.
+
+Key implementation details:
+- Undo/redo rewritten: `strokeLog: [(id, page, stroke)]` + `undoIndex` cursor replaces `UndoManager` + `strokeMetadata` + `strokeOrder`. Active strokes = `strokeLog[0..<undoIndex]`. Each undo/redo steps exactly one stroke.
+- `DrawingsUpdate` proto message (field 12): Mac → iPad, carries only `page_drawings` without PDF bytes. Sent after every undo/redo result for authoritative state sync.
+- File watcher: `DispatchSourceFileSystemObject` on `O_EVTONLY` fd. Silent reload if no unsaved changes; conflict alert if `undoIndex > 0`. Watcher stopped during save to prevent self-triggering.
+- Save fix: `Data.write(to:options:.atomic)` instead of `PDFDocument.write(to:)` — updates mtime correctly.
+- Auto-reconnect: `QuicClient` stores `lastEndpoint`, reconnects on failure with exponential backoff (1s→2s→4s→8s→16s). `disconnectFromServer()` clears endpoint to prevent reconnect on explicit disconnect.
+- iPad undo/redo: `DrawingViewController` implements `@objc undo(_:)` / `redo(_:)` on the responder chain. `PKToolPicker` built-in buttons invoke these directly. Manual Undo/Redo nav bar buttons removed.
+- Remote stroke feedback: `OverlayCoordinator.applyRemoteStrokeRemove/Batch/DrawingUpdate` apply Mac undo/redo results to the live canvas without emitting deltas (delegate set to nil during update).
 
 - v1 targets a single Mac ↔ single iPad topology.
 - The same PDF cannot be opened twice simultaneously in the same Mac session.
@@ -104,3 +115,15 @@ _None currently._
 | 2026-04-21 | StrokeRemove batched: repeated stroke_ids (field 4) |
 | 2026-04-21 | Light mode forced on canvases, tool picker, and Mac overlays |
 | 2026-04-21 | PKCanvasView zoom blur is confirmed Apple limitation — no workaround |
+| 2026-04-21 | strokeLog + undoIndex cursor replaces UndoManager (single source of truth, O(1) undo/redo) |
+| 2026-04-21 | Each undo/redo steps exactly one stroke |
+| 2026-04-21 | Erase (StrokeRemove from iPad) is permanent — not undoable via strokeLog |
+| 2026-04-21 | DrawingsUpdate sent alongside StrokeRemove/StrokeBatch for authoritative iPad state sync |
+| 2026-04-21 | DispatchSourceFileSystemObject (O_EVTONLY) for file watching; watcher stopped during save |
+| 2026-04-21 | Data.write(to:options:.atomic) for save — updates mtime; PDFDocument.write does not |
+| 2026-04-21 | QuicClient auto-reconnect with exponential backoff; disconnectFromServer() prevents reconnect |
+| 2026-04-21 | PKToolPicker undo/redo via @objc undo(_:)/redo(_:) on DrawingViewController responder chain |
+| 2026-04-21 | Stamp annotations use `hasAppearanceStream = true` + 8× raster via `PKDrawing.image(from:scale:)` |
+| 2026-04-21 | Light mode forced for annotation rendering via `performAsCurrentDrawingAppearance` |
+| 2026-04-21 | `baseDrawings` on DocumentSession preserves disk-loaded strokes across strokeLog rebuilds |
+| 2026-04-21 | Vector PDF via async `PKDrawing.draw(in:)` is viable but deferred — 8× raster is sufficient |

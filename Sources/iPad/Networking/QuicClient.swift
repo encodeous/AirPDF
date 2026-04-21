@@ -32,6 +32,9 @@ final class QuicClient: ObservableObject {
     private var receiveBuffer = Data()
     private var lastSessionId: String?
     private var keepaliveTimer: DispatchSourceTimer?
+    private var lastEndpoint: NWEndpoint?
+    private var reconnectAttempt = 0
+    private var reconnectTimer: DispatchSourceTimer?
 
     init() {}
 
@@ -39,51 +42,19 @@ final class QuicClient: ObservableObject {
 
     func connect(to endpoint: NWEndpoint) {
         guard state == .disconnected else { return }
+        lastEndpoint = endpoint
+        reconnectAttempt = 0
         state = .connecting
-
-        let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
-        quicOptions.direction = .bidirectional
-
-        // Generate ephemeral client identity. The server requires a client cert (mTLS),
-        // so we must present one and respond to the CertificateRequest via challenge_block.
-        do {
-            let identity = try TLSIdentity.ephemeral()
-            sec_protocol_options_set_local_identity(quicOptions.securityProtocolOptions, identity.secIdentity)
-            sec_protocol_options_set_challenge_block(
-                quicOptions.securityProtocolOptions,
-                { _, complete in complete(identity.secIdentity) },
-                queue
-            )
-            let fp = TLSFingerprint.of(identity.certificate)
-            Task { @MainActor in self.ownFingerprint = fp }
-        } catch {
-            logger.error("TLSIdentity.ephemeral() failed: \(error)")
-        }
-
-        // Read the Mac's server cert fingerprint from SecTrust during the verify block.
-        sec_protocol_options_set_verify_block(
-            quicOptions.securityProtocolOptions,
-            { [weak self] _, trust, completion in
-                let fp = SecTrustGetCertificateAtIndex(sec_trust_copy_ref(trust).takeRetainedValue(), 0)
-                    .map { TLSFingerprint.of($0) } ?? "unknown"
-                Task { @MainActor in self?.sessionFingerprint = fp }
-                completion(true)
-            },
-            queue
-        )
-        // Disable session resumption so the verify block always fires on every connection.
-        sec_protocol_options_set_tls_resumption_enabled(quicOptions.securityProtocolOptions, false)
-
-        let params = NWParameters(quic: quicOptions)
-        let conn = NWConnection(to: endpoint, using: params)
-        connection = conn
-        conn.stateUpdateHandler = { [weak self] s in Task { @MainActor in self?.handleConnectionState(s) } }
-        conn.start(queue: queue)
+        makeConnection(to: endpoint)
     }
 
-    func disconnect() {
+    /// Explicit user-initiated disconnect. Clears endpoint so auto-reconnect won't fire.
+    func disconnectFromServer() {
         lastSessionId = nil
-        teardown(reason: nil)
+        lastEndpoint = nil
+        reconnectAttempt = 0
+        cancelReconnectTimer()
+        teardown(reconnect: false)
     }
 
     // MARK: - Send
@@ -103,8 +74,7 @@ final class QuicClient: ObservableObject {
             sendHello()
         case .failed(let err):
             logger.error("Connection failed: \(err)")
-            state = .failed(err.localizedDescription)
-            teardown(reason: nil)
+            teardown(reconnect: true)
         case .cancelled:
             if case .connected = state { } else { state = .disconnected }
         default: break
@@ -127,6 +97,8 @@ final class QuicClient: ObservableObject {
             logger.info("New session (was \(last)), discarding cached state")
         }
         lastSessionId = sid
+        reconnectAttempt = 0
+        cancelReconnectTimer()
         state = .connected(sessionId: sid)
         logger.info("Connected, session=\(sid)")
         startKeepalive()
@@ -151,8 +123,8 @@ final class QuicClient: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if let data, !data.isEmpty { self.receiveBuffer.append(data); self.drainBuffer() }
-                if let error { self.logger.error("Receive error: \(error)"); self.teardown(reason: error.localizedDescription); return }
-                if isComplete { self.teardown(reason: nil); return }
+                if let error { self.logger.error("Receive error: \(error)"); self.teardown(reconnect: true); return }
+                if isComplete { self.teardown(reconnect: true); return }
                 self.startReceiving()
             }
         }
@@ -167,14 +139,17 @@ final class QuicClient: ObservableObject {
         case .welcome(let w): handleWelcome(w)
         case .error(let err):
             logger.error("Server error \(err.code.rawValue): \(err.message)")
-            if err.code == .unsupportedVersion { teardown(reason: err.message) }
+            if err.code == .unsupportedVersion {
+                lastEndpoint = nil  // don't reconnect on version mismatch
+                teardown(reconnect: false)
+            }
         default: onMessage?(envelope)
         }
     }
 
     // MARK: - Teardown
 
-    private func teardown(reason: String?) {
+    private func teardown(reconnect: Bool = false) {
         keepaliveTimer?.cancel()
         keepaliveTimer = nil
         connection?.cancel()
@@ -182,7 +157,78 @@ final class QuicClient: ObservableObject {
         receiveBuffer = Data()
         sessionFingerprint = ""
         ownFingerprint = ""
-        state = reason != nil ? .failed(reason!) : .disconnected
+        if reconnect && lastEndpoint != nil {
+            scheduleReconnect()
+        } else {
+            state = .disconnected
+        }
+    }
+
+    // MARK: - Auto-reconnect
+
+    /// Schedule a reconnect attempt with exponential backoff (1s, 2s, 4s, 8s, max 16s).
+    private func scheduleReconnect() {
+        guard let endpoint = lastEndpoint else { return }
+        cancelReconnectTimer()
+        reconnectAttempt += 1
+        let delay = min(pow(2.0, Double(reconnectAttempt - 1)), 16.0)
+        state = .connecting
+        logger.info("Reconnecting in \(delay)s (attempt \(self.reconnectAttempt))")
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + delay)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                self.cancelReconnectTimer()
+                self.makeConnection(to: endpoint)
+            }
+        }
+        timer.resume()
+        reconnectTimer = timer
+    }
+
+    private func cancelReconnectTimer() {
+        reconnectTimer?.cancel()
+        reconnectTimer = nil
+    }
+
+    // MARK: - Make connection
+
+    private func makeConnection(to endpoint: NWEndpoint) {
+        let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
+        quicOptions.direction = .bidirectional
+
+        do {
+            let identity = try TLSIdentity.ephemeral()
+            sec_protocol_options_set_local_identity(quicOptions.securityProtocolOptions, identity.secIdentity)
+            sec_protocol_options_set_challenge_block(
+                quicOptions.securityProtocolOptions,
+                { _, complete in complete(identity.secIdentity) },
+                queue
+            )
+            let fp = TLSFingerprint.of(identity.certificate)
+            Task { @MainActor in self.ownFingerprint = fp }
+        } catch {
+            logger.error("TLSIdentity.ephemeral() failed: \(error)")
+        }
+
+        sec_protocol_options_set_verify_block(
+            quicOptions.securityProtocolOptions,
+            { [weak self] _, trust, completion in
+                let fp = SecTrustGetCertificateAtIndex(sec_trust_copy_ref(trust).takeRetainedValue(), 0)
+                    .map { TLSFingerprint.of($0) } ?? "unknown"
+                Task { @MainActor in self?.sessionFingerprint = fp }
+                completion(true)
+            },
+            queue
+        )
+        sec_protocol_options_set_tls_resumption_enabled(quicOptions.securityProtocolOptions, false)
+
+        let params = NWParameters(quic: quicOptions)
+        let conn = NWConnection(to: endpoint, using: params)
+        connection = conn
+        conn.stateUpdateHandler = { [weak self] s in Task { @MainActor in self?.handleConnectionState(s) } }
+        conn.start(queue: queue)
     }
 }
 #endif

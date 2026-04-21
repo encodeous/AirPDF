@@ -62,7 +62,7 @@ final class QuicServer: ObservableObject {
         let params = NWParameters(quic: quicOptions)
         params.allowLocalEndpointReuse = true
 
-        let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: AirPDFConstants.serverPort)!)
+        let listener = try NWListener(using: params, on: .any)
         self.listener = listener
 
         listener.newConnectionHandler = { [weak self] conn in
@@ -73,8 +73,9 @@ final class QuicServer: ObservableObject {
             Task { @MainActor in
                 switch s {
                 case .ready:
-                    self.state = .running(port: AirPDFConstants.serverPort)
-                    self.logger.info("QUIC server ready on port \(AirPDFConstants.serverPort)")
+                    let port = self.listener?.port?.rawValue ?? 0
+                    self.state = .running(port: port)
+                    self.logger.info("QUIC server ready on port \(port)")
                 case .failed(let err):
                     self.logger.error("Listener failed: \(err)")
                     self.state = .stopped
@@ -110,7 +111,8 @@ final class QuicServer: ObservableObject {
                 guard let self, let client else { return }
                 if self.activeClient === client {
                     self.activeClient = nil
-                    self.state = .running(port: AirPDFConstants.serverPort)
+                    let port = self.listener?.port?.rawValue ?? 0
+                    self.state = .running(port: port)
                     self.onClientDisconnected?()
                 }
             }

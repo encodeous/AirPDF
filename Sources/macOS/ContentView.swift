@@ -47,7 +47,7 @@ struct MacContentView: View {
                     Button("Undo") {
                         if let id = appModel.selectedSessionID,
                            let s = appModel.sessions.first(where: { $0.id == id }) {
-                            s.undoManager.undo()
+                            appModel.handleUndo(session: s)
                             appModel.objectWillChange.send()
                         }
                     }
@@ -56,14 +56,14 @@ struct MacContentView: View {
                         guard let id = appModel.selectedSessionID,
                               let s = appModel.sessions.first(where: { $0.id == id })
                         else { return true }
-                        return !s.undoManager.canUndo
+                        return s.undoIndex == 0
                     }())
                 }
                 ToolbarItem {
                     Button("Redo") {
                         if let id = appModel.selectedSessionID,
                            let s = appModel.sessions.first(where: { $0.id == id }) {
-                            s.undoManager.redo()
+                            appModel.handleRedo(session: s)
                             appModel.objectWillChange.send()
                         }
                     }
@@ -72,7 +72,7 @@ struct MacContentView: View {
                         guard let id = appModel.selectedSessionID,
                               let s = appModel.sessions.first(where: { $0.id == id })
                         else { return true }
-                        return !s.undoManager.canRedo
+                        return s.undoIndex >= s.strokeLog.count
                     }())
                 }
             }
@@ -81,6 +81,17 @@ struct MacContentView: View {
         }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: true) {
             if case .success(let urls) = $0 { appModel.openPDFs(at: urls) }
+        }
+        .alert("File Changed on Disk",
+               isPresented: Binding(
+                   get: { appModel.fileConflictSession != nil },
+                   set: { if !$0 { appModel.fileConflictSession = nil } }
+               ),
+               presenting: appModel.fileConflictSession) { session in
+            Button("Reload from Disk", role: .destructive) { appModel.reloadFromDisk(session: session) }
+            Button("Keep In-Memory Version") { appModel.keepInMemory(session: session) }
+        } message: { session in
+            Text("\"\(session.fileName)\" was modified by another application. Reload from disk or keep your unsaved changes?")
         }
         .onAppear { appModel.startServer() }
     }

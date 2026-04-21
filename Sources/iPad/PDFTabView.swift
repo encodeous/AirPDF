@@ -5,6 +5,7 @@ import PDFKit
 struct PDFTabView: View {
     @ObservedObject var store: DocumentStore
     let onStrokeDelta: (Airpdf_V1_SyncEnvelope) -> Void
+    let onVCReady: (DrawingViewController) -> Void
     @State private var selectedId: String?
 
     var body: some View {
@@ -30,7 +31,7 @@ struct PDFTabView: View {
                     Divider()
                 }
                 if let doc = docs.first(where: { $0.id == sel }) ?? docs.first {
-                    PDFCanvasView(doc: doc, onStrokeDelta: onStrokeDelta)
+                    PDFCanvasView(doc: doc, onStrokeDelta: onStrokeDelta, onVCReady: onVCReady)
                         .id(doc.id)
                 }
             }

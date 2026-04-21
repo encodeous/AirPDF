@@ -11,11 +11,20 @@ final class DocumentSession: Identifiable, @unchecked Sendable {
     let pageCount: Int
     let pdfDocument: PDFDocument
     var pageDrawings: [Int: Data]       // page index → PKDrawing.dataRepresentation()
-    var strokeMetadata: [Int: [String: PKStroke]] = [:] // page → strokeId → PKStroke
-    let undoManager = UndoManager()
+    /// Base drawings loaded from disk (immutable after init/reload). Used to merge with strokeLog.
+    var baseDrawings: [Int: PKDrawing] = [:]
+    /// Ordered log of all strokes received. undoIndex is the cursor into this log.
+    /// Active strokes = strokeLog[0..<undoIndex]. Undo decrements, redo increments.
+    var strokeLog: [(id: String, page: Int, stroke: PKStroke)] = []
+    var undoIndex: Int = 0
     var needsDisplayUpdate = false
     weak var pdfViewRef: PDFView?
     weak var overlayCoordinator: MacOverlayCoordinator?
+
+    /// Set to true when an external file change is detected while there are unsaved in-memory changes.
+    var hasExternalConflict = false
+
+    private var fileWatchSource: DispatchSourceFileSystemObject?
 
     init(fileName: String, fileURL: URL, pdfDocument: PDFDocument) {
         self.id = UUID()
@@ -36,7 +45,36 @@ final class DocumentSession: Identifiable, @unchecked Sendable {
             }
         }
         self.pageDrawings = drawings
+        // Cache base drawings for merging with strokeLog
+        var base: [Int: PKDrawing] = [:]
+        for (idx, data) in drawings {
+            if let d = try? PKDrawing(data: data) { base[idx] = d }
+        }
+        self.baseDrawings = base
     }
+
+    /// Start watching the file for external changes. Calls `onChange` on the main queue.
+    func startWatching(onChange: @escaping () -> Void) {
+        stopWatching()
+        let fd = open(fileURL.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: .write,
+            queue: .main
+        )
+        source.setEventHandler(handler: onChange)
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        fileWatchSource = source
+    }
+
+    func stopWatching() {
+        fileWatchSource?.cancel()
+        fileWatchSource = nil
+    }
+
+    deinit { stopWatching() }
 }
 
 extension DocumentSession: Equatable {
