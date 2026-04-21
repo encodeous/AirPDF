@@ -104,40 +104,22 @@ message Heartbeat {}
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Mac → iPad: open a new document tab, or replace the state of an existing one.
-//
-// On initial open: the Mac strips all stroke outline annotations and
-// airpdf_drawing.pkdata attachments from the PDF, then sends the stripped bytes
-// as `content` alongside the per-page PKDrawing snapshots in `page_drawings`.
-//
-// On re-send (same document_id, e.g. after Mac adds a text box or new pages):
-// the iPad fully replaces its local PDF bytes, per-page drawings, and stroke
-// identity maps for this document. Any unsent local deltas are discarded.
-// If the page count changes, the iPad tears down all PKCanvasView instances
-// for this document and recreates them from the new page_drawings map.
+// page_strokes carries the canonical (stroke_id, pk_stroke_data) list per page.
+// The iPad builds its runtime PKStroke→UUID mapping directly from this.
 message PdfData {
-  // Ephemeral UUID assigned by the Mac when the file is opened.
-  // Not derived from path or file content. Stable for the document's lifetime.
   string document_id = 1;
-
-  // Original filename for display in the iPad tab bar (e.g. "Lecture Notes.pdf").
   string file_name = 2;
-
-  // Raw PDF bytes with ALL stroke outline annotations and airpdf_drawing.pkdata
-  // attachments stripped. This prevents the PDF renderer and the PKCanvasView
-  // overlay from both drawing the same strokes.
+  // Stripped PDF bytes (all airpdf_strokes.pb attachments and Stamp annotations removed).
   bytes content = 3;
-
-  // SHA-256 digest of `content` for integrity verification on the iPad.
   bytes content_sha256 = 4;
-
-  // Per-page PKDrawing snapshots. Key = 0-based page index, Value =
-  // PKDrawing.dataRepresentation() bytes. Pages absent from this map have no
-  // strokes; the iPad initializes them with an empty PKDrawing.
-  map<uint32, bytes> page_drawings = 5;
-
-  // Total number of pages in the PDF. Lets the iPad pre-allocate per-page
-  // canvas views without parsing the PDF bytes first.
   uint32 page_count = 6;
+  // Per-page ordered stroke list. Key = 0-based page index.
+  map<uint32, PageStrokes> page_strokes = 7;
+}
+
+// Ordered list of strokes for a single page. Used in PdfData, DrawingsUpdate, and on disk.
+message PageStrokes {
+  repeated StrokeEntry strokes = 1;
 }
 
 // Mac → iPad: close the document and remove its tab.
@@ -220,15 +202,12 @@ message Redo {
 // Drawings-only Update
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Mac → iPad: update per-page drawings without re-sending PDF bytes.
-// Sent instead of PdfData when only strokes changed (e.g. undo/redo result).
-// The iPad merges the provided page_drawings into its current state and resets
-// the stroke-id baseline for each updated page.
+// Mac → iPad: update per-page strokes without re-sending PDF bytes.
+// Sent after every undo/redo result.
 message DrawingsUpdate {
   string document_id = 1;
-  // Updated per-page PKDrawing snapshots. Only pages present in this map are
-  // replaced; other pages are left unchanged.
-  map<uint32, bytes> page_drawings = 2;
+  // Updated per-page stroke lists. Only pages present in this map are replaced.
+  map<uint32, PageStrokes> page_strokes = 3;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -267,5 +246,5 @@ enum ErrorCode {
 // Session timeout:            30 seconds
 // Heartbeat interval:         5 seconds
 // Max concurrent clients:     1
-// PKDrawing attachment name:  "airpdf_drawing.pkdata" (per-page file attachment)
+// Stroke attachment name:     "airpdf_strokes.pb" (per-page protobuf PageStrokes attachment)
 //

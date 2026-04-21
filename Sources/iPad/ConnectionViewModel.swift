@@ -52,6 +52,7 @@ final class ConnectionViewModel: ObservableObject {
     func disconnect() {
         client.disconnectFromServer()
         documentStore.closeAll()
+        activeDrawingVC = nil
     }
 
     private func handleMessage(_ envelope: Airpdf_V1_SyncEnvelope) {
@@ -62,17 +63,20 @@ final class ConnectionViewModel: ObservableObject {
         case .pdfClose(let msg):
             logger.info("Received PdfClose: docId=\(msg.documentID)")
             documentStore.close(documentId: msg.documentID)
+            activeDrawingVC = nil
         case .strokeRemove, .strokeBatch:
-            // Ignored — DrawingsUpdate is the authoritative state sync for undo/redo.
-            // Individual StrokeRemove/StrokeBatch from Mac are always followed by DrawingsUpdate.
             break
         case .drawingsUpdate(let msg):
-            // Authoritative drawing state from Mac (sent after every undo/redo).
-            // Update both the document store and the live annotation coordinator.
-            logger.info("Received DrawingsUpdate from Mac: doc=\(msg.documentID) pages=\(msg.pageDrawings.count)")
+            logger.info("Received DrawingsUpdate from Mac: doc=\(msg.documentID) pages=\(msg.pageStrokes.count)")
             documentStore.applyDrawingsUpdate(msg)
-            for (k, v) in msg.pageDrawings {
-                activeDrawingVC?.overlayCoordinator.applyRemoteDrawingUpdate(pageIndex: Int(k), drawingData: v)
+            for (k, ps) in msg.pageStrokes {
+                let entries: [(id: UUID, stroke: PKStroke)] = ps.strokes.compactMap { entry in
+                    guard let uuid = UUID(uuidString: entry.strokeID),
+                          let drawing = try? PKDrawing(data: entry.pkStrokeData),
+                          let stroke = drawing.strokes.first else { return nil }
+                    return (id: uuid, stroke: stroke)
+                }
+                activeDrawingVC?.applyRemoteDrawingUpdate(pageIndex: Int(k), entries: entries)
             }
         default:
             break

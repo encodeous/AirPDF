@@ -10,7 +10,7 @@ enum PDFStripper {
             guard let page = copy.page(at: i) else { continue }
             let toRemove = page.annotations.filter {
                 $0.type == "Ink" || $0.type == "Stamp" ||
-                ($0.type == "FileAttachment" && $0.contents == "airpdf_drawing.pkdata")
+                ($0.type == "FileAttachment" && ($0.contents == "airpdf_strokes.pb" || $0.contents == "airpdf_drawing.pkdata"))
             }
             toRemove.forEach { page.removeAnnotation($0) }
         }

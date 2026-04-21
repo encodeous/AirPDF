@@ -54,6 +54,17 @@ struct MacContentView: View {
         } message: { session in
             Text("\"\(session.fileName)\" was modified by another application. Reload from disk or keep your unsaved changes?")
         }
+        .alert("Unsaved Changes",
+               isPresented: Binding(
+                   get: { appModel.closeConfirmSession != nil },
+                   set: { if !$0 { appModel.closeConfirmSession = nil } }
+               ),
+               presenting: appModel.closeConfirmSession) { session in
+            Button("Close Without Saving", role: .destructive) { appModel.forceClose(session: session) }
+            Button("Cancel", role: .cancel) { appModel.closeConfirmSession = nil }
+        } message: { session in
+            Text("\"\(session.fileName)\" has unsaved changes. Close anyway?")
+        }
         .onAppear { appModel.startServer() }
         .onReceive(NotificationCenter.default.publisher(for: .openPDFURLs)) { note in
             if let urls = note.object as? [URL] { appModel.openPDFs(at: urls) }

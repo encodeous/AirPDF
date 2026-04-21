@@ -18,6 +18,8 @@ struct MacPDFView: NSViewRepresentable {
         view.document = document
         session.pdfViewRef = view
         session.overlayCoordinator = context.coordinator
+        // Rebuild annotations now that coordinator is wired — disk strokes are already in strokeLog.
+        context.coordinator.rebuildAnnotations()
         return view
     }
 
@@ -48,7 +50,9 @@ final class MacAnnotationCoordinator: NSObject {
     /// Remove stroke annotations by ID. Uses page re-insert to force visual refresh
     /// (Apple removeAnnotation display bug), with scroll position preserved.
     func removeStrokeAnnotations(page pageIdx: Int, ids: Set<String>) {
+        let hadLayer = annotationLayers[pageIdx] != nil
         annotationLayers[pageIdx]?.removeStrokes(ids: ids)
+        NSLog("removeStrokeAnnotations page \(pageIdx): ids=\(ids) hadLayer=\(hadLayer) layerCount=\(annotationLayers[pageIdx]?.strokeIds.count ?? -1)")
         invalidatePage(pageIdx)
     }
 
@@ -63,6 +67,7 @@ final class MacAnnotationCoordinator: NSObject {
         removeAllAnnotations()
         for pageIdx in 0..<session.pageCount {
             rebuildAnnotationsForPage(pageIdx)
+            invalidatePage(pageIdx)
         }
     }
 
@@ -73,14 +78,10 @@ final class MacAnnotationCoordinator: NSObject {
 
     private func rebuildAnnotationsForPage(_ pageIdx: Int) {
         guard let layer = annotationLayer(for: pageIdx) else { return }
-        if let drawing = session.baseDrawings[pageIdx] {
-            for (i, stroke) in drawing.strokes.enumerated() {
-                let sid = "base_\(pageIdx)_\(i)"
-                if !layer.strokeIds.contains(sid) { layer.addStroke(id: sid, stroke: stroke) }
-            }
-        }
         for entry in session.strokeLog[0..<session.undoIndex] where entry.page == pageIdx {
-            if !layer.strokeIds.contains(entry.id) { layer.addStroke(id: entry.id, stroke: entry.stroke) }
+            if !layer.strokeIds.contains(entry.id.uuidString) {
+                layer.addStroke(id: entry.id.uuidString, stroke: entry.stroke)
+            }
         }
     }
 
@@ -88,7 +89,11 @@ final class MacAnnotationCoordinator: NSObject {
     private func invalidatePage(_ pageIdx: Int) {
         guard let pdfView = session.pdfViewRef,
               let doc = pdfView.document,
-              let page = doc.page(at: pageIdx) else { return }
+              let page = doc.page(at: pageIdx) else {
+            NSLog("invalidatePage \(pageIdx): SKIPPED pdfViewRef=\(session.pdfViewRef != nil) doc=\(session.pdfViewRef?.document != nil)")
+            return
+        }
+        NSLog("invalidatePage \(pageIdx): executing, annotations=\(page.annotations.count)")
         let dest = pdfView.currentDestination
         doc.removePage(at: pageIdx)
         doc.insert(page, at: pageIdx)

@@ -32,7 +32,7 @@ struct PDFTabView: View {
                 }
                 if let doc = docs.first(where: { $0.id == sel }) ?? docs.first {
                     PDFCanvasView(doc: doc, onStrokeDelta: onStrokeDelta, onVCReady: onVCReady)
-                        .id(doc.id)
+                        .id(doc)
                 }
             }
             .onChange(of: store.documents) { _, newDocs in

@@ -38,7 +38,9 @@ final class StrokeAnnotationLayer {
     /// Remove strokes by ID. Strips all annotations and re-adds survivors
     /// to work around Apple's removeAnnotation display bug.
     func removeStrokes(ids: Set<String>) {
+        let before = strokes.count
         for id in ids { strokes.removeValue(forKey: id) }
+        NSLog("StrokeAnnotationLayer.removeStrokes: requested=\(ids.count) found=\(before - strokes.count) remaining=\(strokes.count) knownIds=\(Array(strokes.keys).prefix(3))")
         rebuild()
     }
 
