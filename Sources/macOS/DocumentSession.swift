@@ -19,7 +19,7 @@ final class DocumentSession: Identifiable, @unchecked Sendable {
     var undoIndex: Int = 0
     var needsDisplayUpdate = false
     weak var pdfViewRef: PDFView?
-    weak var overlayCoordinator: MacOverlayCoordinator?
+    weak var overlayCoordinator: MacAnnotationCoordinator?
 
     /// Set to true when an external file change is detected while there are unsaved in-memory changes.
     var hasExternalConflict = false

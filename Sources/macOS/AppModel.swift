@@ -143,12 +143,13 @@ final class AppModel: ObservableObject {
             let pageIdx = Int(msg.pageIndex)
             // Truncate any redo history above the cursor
             session.strokeLog.removeSubrange(session.undoIndex...)
-            let insertStart = session.undoIndex
             for entry in msg.strokes {
                 guard let drawing = try? PKDrawing(data: entry.pkStrokeData),
                       let stroke = drawing.strokes.first else { continue }
                 session.strokeLog.append((id: entry.strokeID, page: pageIdx, stroke: stroke))
                 session.undoIndex += 1
+                // Add annotation for the new stroke
+                session.overlayCoordinator?.addStrokeAnnotation(page: pageIdx, id: entry.strokeID, stroke: stroke)
             }
             rebuildDrawing(session: session, page: pageIdx)
             objectWillChange.send()
@@ -160,6 +161,7 @@ final class AppModel: ObservableObject {
             // Remove matching entries from the log entirely (erase is permanent, not undoable here)
             session.strokeLog.removeAll { removeSet.contains($0.id) }
             session.undoIndex = min(session.undoIndex, session.strokeLog.count)
+            session.overlayCoordinator?.removeStrokeAnnotations(page: pageIdx, ids: removeSet)
             rebuildDrawing(session: session, page: pageIdx)
             objectWillChange.send()
 
@@ -189,6 +191,7 @@ final class AppModel: ObservableObject {
         guard session.undoIndex > 0 else { return }
         session.undoIndex -= 1
         let entry = session.strokeLog[session.undoIndex]
+        session.overlayCoordinator?.removeStrokeAnnotations(page: entry.page, ids: [entry.id])
         rebuildDrawing(session: session, page: entry.page)
         var remove = Airpdf_V1_StrokeRemove()
         remove.documentID = session.documentId
@@ -202,6 +205,7 @@ final class AppModel: ObservableObject {
         guard session.undoIndex < session.strokeLog.count else { return }
         let entry = session.strokeLog[session.undoIndex]
         session.undoIndex += 1
+        session.overlayCoordinator?.addStrokeAnnotation(page: entry.page, id: entry.id, stroke: entry.stroke)
         rebuildDrawing(session: session, page: entry.page)
         var batch = Airpdf_V1_StrokeBatch()
         batch.documentID = session.documentId
@@ -256,7 +260,7 @@ final class AppModel: ObservableObject {
         session.strokeLog = []
         session.undoIndex = 0
         session.pdfViewRef?.document = newDoc
-        session.overlayCoordinator?.refreshOverlays()
+        session.overlayCoordinator?.rebuildAnnotations()
         // Re-send to iPad
         if let client = activeClient {
             client.send(.wrap(.pdfData(makePdfData(for: session))))
@@ -279,10 +283,12 @@ final class AppModel: ObservableObject {
         guard let id = selectedSessionID,
               let session = sessions.first(where: { $0.id == id }) else { return }
         session.stopWatching()
+        // Remove live-preview annotations (managed by StrokeAnnotationLayer)
+        session.overlayCoordinator?.removeAllAnnotations()
         // Attach pkdata + visible stamp per page
         for (pageIdx, drawingData) in session.pageDrawings {
             guard let page = session.pdfDocument.page(at: pageIdx) else { continue }
-            // Remove old AirPDF annotations (pkdata + stamps)
+            // Remove old AirPDF annotations (pkdata + any leftover stamps)
             page.annotations
                 .filter {
                     ($0.type == "FileAttachment" && $0.contents == "airpdf_drawing.pkdata") ||
@@ -302,10 +308,10 @@ final class AppModel: ObservableObject {
                 page.addAnnotation(DrawingAnnotation(drawing: drawing, bounds: bounds))
             }
         }
-        // Write PDF data directly — PDFDocument.write preserves mtime via atomic swap internals.
-        // Using Data.write gives a fresh file with updated modification date.
+        // Write PDF data
         guard let pdfData = session.pdfDocument.dataRepresentation() else {
             logger.error("saveSelectedPDF: dataRepresentation() returned nil")
+            session.overlayCoordinator?.rebuildAnnotations()
             session.startWatching { [weak self, weak session] in
                 guard let self, let session else { return }
                 self.handleExternalFileChange(session: session)
@@ -318,6 +324,14 @@ final class AppModel: ObservableObject {
         } catch {
             logger.error("saveSelectedPDF: write failed: \(error)")
         }
+        // Remove save-time stamps (they're in the file now) and restore live annotations
+        for i in 0..<session.pdfDocument.pageCount {
+            guard let page = session.pdfDocument.page(at: i) else { continue }
+            page.annotations
+                .filter { $0.type == "Stamp" }
+                .forEach { page.removeAnnotation($0) }
+        }
+        session.overlayCoordinator?.rebuildAnnotations()
         session.startWatching { [weak self, weak session] in
             guard let self, let session else { return }
             self.handleExternalFileChange(session: session)

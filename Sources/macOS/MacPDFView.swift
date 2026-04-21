@@ -7,15 +7,14 @@ struct MacPDFView: NSViewRepresentable {
     let document: PDFDocument
     let session: DocumentSession
 
-    func makeCoordinator() -> MacOverlayCoordinator {
-        MacOverlayCoordinator(session: session)
+    func makeCoordinator() -> MacAnnotationCoordinator {
+        MacAnnotationCoordinator(session: session)
     }
 
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
         view.autoScales = true
         view.displayMode = .singlePageContinuous
-        view.pageOverlayViewProvider = context.coordinator
         view.document = document
         session.pdfViewRef = view
         session.overlayCoordinator = context.coordinator
@@ -27,69 +26,85 @@ struct MacPDFView: NSViewRepresentable {
             nsView.document = document
             session.pdfViewRef = nsView
         }
-        // Refresh overlays when drawings change
-        if session.needsDisplayUpdate {
-            session.needsDisplayUpdate = false
-            context.coordinator.refreshOverlays()
-        }
     }
 }
 
-/// Provides per-page overlay NSViews that render PKDrawing as vector on the Mac.
-final class MacOverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
+/// Manages per-page 8× stamp annotations on the Mac PDF viewer.
+/// No overlay needed — annotations are the sole display layer.
+final class MacAnnotationCoordinator: NSObject {
     let session: DocumentSession
-    private var overlays: [PDFPage: DrawingOverlayView] = [:]
+    private var annotationLayers: [Int: StrokeAnnotationLayer] = [:]
 
     init(session: DocumentSession) {
         self.session = session
     }
 
-    func refreshOverlays() {
-        for (page, overlay) in overlays {
-            guard let doc = page.document else { continue }
-            let idx = doc.index(for: page)
-            if let data = session.pageDrawings[idx], let drawing = try? PKDrawing(data: data) {
-                overlay.drawing = drawing
-            } else {
-                overlay.drawing = PKDrawing()
+    /// Add a stroke as an annotation on the given page.
+    func addStrokeAnnotation(page: Int, id: String, stroke: PKStroke) {
+        guard let layer = annotationLayer(for: page) else { return }
+        layer.addStroke(id: id, stroke: stroke)
+    }
+
+    /// Remove stroke annotations by ID. Uses page re-insert to force visual refresh
+    /// (Apple removeAnnotation display bug), with scroll position preserved.
+    func removeStrokeAnnotations(page pageIdx: Int, ids: Set<String>) {
+        annotationLayers[pageIdx]?.removeStrokes(ids: ids)
+        invalidatePage(pageIdx)
+    }
+
+    /// Remove all live annotations (e.g. before save).
+    func removeAllAnnotations() {
+        for layer in annotationLayers.values { layer.removeAll() }
+        annotationLayers.removeAll()
+    }
+
+    /// Rebuild all annotations from the session's strokeLog. Called after save or reload.
+    func rebuildAnnotations() {
+        removeAllAnnotations()
+        for pageIdx in 0..<session.pageCount {
+            rebuildAnnotationsForPage(pageIdx)
+        }
+    }
+
+    /// No-op — kept for compatibility with existing callsites.
+    func refreshOverlays() {}
+
+    // MARK: - Private
+
+    private func rebuildAnnotationsForPage(_ pageIdx: Int) {
+        guard let layer = annotationLayer(for: pageIdx) else { return }
+        if let drawing = session.baseDrawings[pageIdx] {
+            for (i, stroke) in drawing.strokes.enumerated() {
+                let sid = "base_\(pageIdx)_\(i)"
+                if !layer.strokeIds.contains(sid) { layer.addStroke(id: sid, stroke: stroke) }
             }
-            overlay.needsDisplay = true
+        }
+        for entry in session.strokeLog[0..<session.undoIndex] where entry.page == pageIdx {
+            if !layer.strokeIds.contains(entry.id) { layer.addStroke(id: entry.id, stroke: entry.stroke) }
         }
     }
 
-    func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> NSView? {
-        if let existing = overlays[page] { return existing }
-
-        guard let doc = view.document else { return nil }
-        let idx = doc.index(for: page)
-
-        let overlay = DrawingOverlayView()
-        overlay.appearance = NSAppearance(named: .aqua)
-        if let data = session.pageDrawings[idx], let drawing = try? PKDrawing(data: data) {
-            overlay.drawing = drawing
-        }
-        overlays[page] = overlay
-        return overlay
+    /// Force PDFKit to visually refresh a page. Saves and restores scroll position.
+    private func invalidatePage(_ pageIdx: Int) {
+        guard let pdfView = session.pdfViewRef,
+              let doc = pdfView.document,
+              let page = doc.page(at: pageIdx) else { return }
+        let dest = pdfView.currentDestination
+        doc.removePage(at: pageIdx)
+        doc.insert(page, at: pageIdx)
+        if let dest { pdfView.go(to: dest) }
     }
 
-    func pdfView(_ pdfView: PDFView, willEndDisplayingOverlayView overlayView: NSView, for page: PDFPage) {
-        overlays.removeValue(forKey: page)
+    // MARK: - Private
+
+    private func annotationLayer(for pageIndex: Int) -> StrokeAnnotationLayer? {
+        if let existing = annotationLayers[pageIndex] { return existing }
+        guard let pdfView = session.pdfViewRef,
+              let page = pdfView.document?.page(at: pageIndex) else { return nil }
+        let layer = StrokeAnnotationLayer(page: page)
+        annotationLayers[pageIndex] = layer
+        return layer
     }
-}
 
-/// A simple NSView that renders a PKDrawing using its vector image representation.
-final class DrawingOverlayView: NSView {
-    var drawing = PKDrawing()
-
-    override var isFlipped: Bool { true }
-    override var isOpaque: Bool { false }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard !drawing.strokes.isEmpty else { return }
-        // Render at high scale for crispness
-        let scale = window?.backingScaleFactor ?? 2.0
-        let image = drawing.image(from: drawing.bounds, scale: scale)
-        image.draw(in: drawing.bounds)
-    }
 }
 #endif

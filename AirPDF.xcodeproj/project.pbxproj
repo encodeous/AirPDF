@@ -66,6 +66,9 @@
 		A380B3512F9744BC00FB766D /* PDFCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B3502F9744BC00FB766D /* PDFCanvasView.swift */; };
 		A380B3522F9744BC00FB766D /* PDFCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B3502F9744BC00FB766D /* PDFCanvasView.swift */; };
 		A380B3532F9744BC00FB766D /* PDFCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B3502F9744BC00FB766D /* PDFCanvasView.swift */; };
+		A380B3CB2F976E5500FB766D /* StrokeAnnotationLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B3CA2F976E5500FB766D /* StrokeAnnotationLayer.swift */; };
+		A380B3CC2F976E5500FB766D /* StrokeAnnotationLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B3CA2F976E5500FB766D /* StrokeAnnotationLayer.swift */; };
+		A380B3CD2F976E5500FB766D /* StrokeAnnotationLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B3CA2F976E5500FB766D /* StrokeAnnotationLayer.swift */; };
 		BB000001000000000000001A /* PDFStripper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000001000000000000000A /* PDFStripper.swift */; };
 		BB000001000000000000001B /* PDFStripper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000001000000000000000A /* PDFStripper.swift */; };
 		BB000001000000000000001C /* PDFStripper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000001000000000000000A /* PDFStripper.swift */; };
@@ -126,6 +129,7 @@
 		A380B1762F9715EB00FB766D /* swift-protobuf-config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "swift-protobuf-config.json"; sourceTree = "<group>"; };
 		A380B3132F97376F00FB766D /* StrokeAnnotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeAnnotation.swift; sourceTree = "<group>"; };
 		A380B3502F9744BC00FB766D /* PDFCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFCanvasView.swift; sourceTree = "<group>"; };
+		A380B3CA2F976E5500FB766D /* StrokeAnnotationLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeAnnotationLayer.swift; sourceTree = "<group>"; };
 		BB000001000000000000000A /* PDFStripper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFStripper.swift; sourceTree = "<group>"; };
 		BB000002000000000000000A /* MacPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPDFView.swift; sourceTree = "<group>"; };
 		BB000003000000000000000A /* DocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStore.swift; sourceTree = "<group>"; };
@@ -224,6 +228,7 @@
 				BB000001000000000000000A /* PDFStripper.swift */,
 				BB000005000000000000000A /* TLSFingerprint.swift */,
 				BB000006000000000000000A /* TLSIdentity.swift */,
+				A380B3CA2F976E5500FB766D /* StrokeAnnotationLayer.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -474,6 +479,7 @@
 				A380B0F72F96F47100FB766D /* ConnectionView.swift in Sources */,
 				A380B0F82F96F47100FB766D /* QuicClient.swift in Sources */,
 				BB000001000000000000001A /* PDFStripper.swift in Sources */,
+				A380B3CB2F976E5500FB766D /* StrokeAnnotationLayer.swift in Sources */,
 				BB000002000000000000001A /* MacPDFView.swift in Sources */,
 				BB000003000000000000001A /* DocumentStore.swift in Sources */,
 				BB000004000000000000001A /* PDFTabView.swift in Sources */,
@@ -505,6 +511,7 @@
 				A380B0E52F96F47100FB766D /* ConnectionView.swift in Sources */,
 				A380B0E62F96F47100FB766D /* QuicClient.swift in Sources */,
 				BB000001000000000000001B /* PDFStripper.swift in Sources */,
+				A380B3CC2F976E5500FB766D /* StrokeAnnotationLayer.swift in Sources */,
 				BB000002000000000000001B /* MacPDFView.swift in Sources */,
 				BB000003000000000000001B /* DocumentStore.swift in Sources */,
 				BB000004000000000000001B /* PDFTabView.swift in Sources */,
@@ -533,6 +540,7 @@
 				A380B3512F9744BC00FB766D /* PDFCanvasView.swift in Sources */,
 				A380B0D02F96F47100FB766D /* ClientConnection.swift in Sources */,
 				A380B0D12F96F47100FB766D /* ConnectionViewModel.swift in Sources */,
+				A380B3CD2F976E5500FB766D /* StrokeAnnotationLayer.swift in Sources */,
 				A380B0D22F96F47100FB766D /* ConnectionView.swift in Sources */,
 				A380B0D32F96F47100FB766D /* QuicClient.swift in Sources */,
 				BB000001000000000000001C /* PDFStripper.swift in Sources */,
