@@ -59,6 +59,7 @@
 		A380B10A2F96F73400FB766D /* airpdf.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B1072F96F73400FB766D /* airpdf.pb.swift */; };
 		A380B10B2F96F73400FB766D /* airpdf.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A380B1072F96F73400FB766D /* airpdf.pb.swift */; };
 		A380B10E2F96F8A500FB766D /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = A380B10D2F96F8A500FB766D /* SwiftProtobuf */; };
+		A380B1672F97088400FB766D /* X509 in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = A380B1662F97088400FB766D /* X509 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -137,6 +138,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A380B1672F97088400FB766D /* X509 in Frameworks */,
 				A380B10E2F96F8A500FB766D /* SwiftProtobuf in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -280,6 +282,7 @@
 			name = AirPDF;
 			packageProductDependencies = (
 				A380B10D2F96F8A500FB766D /* SwiftProtobuf */,
+				A380B1662F97088400FB766D /* X509 */,
 			);
 			productName = AirPDF;
 			productReference = A380B0482F96F21A00FB766D /* AirPDF.app */;
@@ -365,6 +368,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A380B0FA2F96F50A00FB766D /* XCRemoteSwiftPackageReference "swift-protobuf" */,
+				A380B1652F97084E00FB766D /* XCRemoteSwiftPackageReference "swift-certificates" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A380B0492F96F21A00FB766D /* Products */;
@@ -873,6 +877,14 @@
 				minimumVersion = 1.37.0;
 			};
 		};
+		A380B1652F97084E00FB766D /* XCRemoteSwiftPackageReference "swift-certificates" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-certificates.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.19.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -880,6 +892,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A380B0FA2F96F50A00FB766D /* XCRemoteSwiftPackageReference "swift-protobuf" */;
 			productName = SwiftProtobuf;
+		};
+		A380B1662F97088400FB766D /* X509 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A380B1652F97084E00FB766D /* XCRemoteSwiftPackageReference "swift-certificates" */;
+			productName = X509;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -29,11 +29,13 @@ enum FrameCodec {
     /// Returns nil if the buffer doesn't yet contain a complete message.
     static func decode(from buffer: inout Data) throws -> Airpdf_V1_SyncEnvelope? {
         guard buffer.count >= headerSize else { return nil }
-        let length = Int(UInt32(bigEndian: buffer.prefix(headerSize).withUnsafeBytes { $0.load(as: UInt32.self) }))
+        let length = Int(buffer.withUnsafeBytes {
+            $0.loadUnaligned(fromByteOffset: 0, as: UInt32.self).bigEndian
+        })
         guard buffer.count >= headerSize + length else { return nil }
-        let body = buffer[headerSize ..< headerSize + length]
-        let envelope = try Airpdf_V1_SyncEnvelope(serializedBytes: body)
-        buffer.removeFirst(headerSize + length)
+        let start = buffer.startIndex + headerSize
+        let envelope = try Airpdf_V1_SyncEnvelope(serializedBytes: buffer[start ..< start + length])
+        buffer = buffer.dropFirst(headerSize + length)
         return envelope
     }
 }

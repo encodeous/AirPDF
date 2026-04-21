@@ -10,7 +10,7 @@ package airpdf.v1;
 // Discovery: Bonjour service type "_airpdf._udp".
 // Framing: Each message on the wire is a length-prefixed SyncEnvelope.
 // Ordering: Strict FIFO — one stream guarantees no out-of-order delivery.
-// Session timeout: 1 minute of missed heartbeats triggers disconnect.
+// Liveness: QUIC transport-level keepalive (no application-level heartbeat).
 // Single client: v1 supports exactly one connected iPad at a time.
 //
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -33,12 +33,6 @@ message Payload {
     // Mac → iPad: reply to Hello. Followed immediately by PdfData for every
     // currently-open document so the iPad can restore full session state.
     Welcome welcome = 2;
-
-    // ── Connectivity ────────────────────────────────────────────────────────
-    // Bidirectional heartbeat. If no Pong is received within 1 minute, the
-    // sender tears down the connection.
-    Ping ping = 3;
-    Pong pong = 4;
 
     // ── Document lifecycle ──────────────────────────────────────────────────
     // Mac → iPad: open or replace a document tab.
@@ -94,20 +88,6 @@ message Welcome {
   // a *different* session_id back, it must discard all cached document state;
   // the Mac will re-deliver PdfData for every open document immediately after.
   string session_id = 2;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Connectivity / Heartbeat
-// ═══════════════════════════════════════════════════════════════════════════════
-
-message Ping {
-  // Monotonically increasing sequence number for RTT measurement.
-  uint64 sequence = 1;
-}
-
-message Pong {
-  // Echoes the sequence from the corresponding Ping.
-  uint64 sequence = 1;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -260,8 +240,7 @@ enum ErrorCode {
 // ═══════════════════════════════════════════════════════════════════════════════
 //
 // Bonjour service type:       "_airpdf._udp"
-// Session timeout:            60 seconds (1 minute)
-// Heartbeat interval:         ~10 seconds (implementation detail)
+// Session timeout:            1 minute (QUIC keepalive idle timeout)
 // Max concurrent clients:     1
 // PKDrawing attachment name:  "airpdf_drawing.pkdata" (per-page file attachment)
 //

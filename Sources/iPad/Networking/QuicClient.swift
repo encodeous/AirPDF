@@ -5,7 +5,8 @@ import Network
 import os
 
 /// Manages the iPad's QUIC connection to the Mac host.
-/// Handles Hello/Welcome handshake, session resume, heartbeat ping/pong, and 1-minute timeout.
+/// Handles Hello/Welcome handshake and session resume.
+/// Liveness is handled by QUIC transport-level keepalive.
 @MainActor
 final class QuicClient: ObservableObject {
     enum State: Equatable {
@@ -25,11 +26,6 @@ final class QuicClient: ObservableObject {
     private let logger = Logger(subsystem: "dev.airpdf.ipad", category: "QuicClient")
 
     private var receiveBuffer = Data()
-    private var heartbeatTimer: DispatchSourceTimer?
-    private var timeoutTimer: DispatchSourceTimer?
-    private var pingSequence: UInt64 = 0
-
-    // Persisted across reconnects within the timeout window
     private var lastSessionId: String?
 
     init() {}
@@ -40,16 +36,13 @@ final class QuicClient: ObservableObject {
         guard state == .disconnected else { return }
         state = .connecting
 
-        let tlsOptions = NWProtocolTLS.Options()
-        // Accept self-signed cert from the Mac server
+        let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
+        quicOptions.direction = .bidirectional
         sec_protocol_options_set_verify_block(
-            tlsOptions.securityProtocolOptions,
+            quicOptions.securityProtocolOptions,
             { _, _, completion in completion(true) },
             queue
         )
-
-        let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
-        quicOptions.direction = .bidirectional
 
         let params = NWParameters(quic: quicOptions)
         let conn = NWConnection(to: endpoint, using: params)
@@ -81,15 +74,12 @@ final class QuicClient: ObservableObject {
             state = .handshaking
             startReceiving()
             sendHello()
-            startTimeoutTimer()
         case .failed(let err):
             logger.error("Connection failed: \(err)")
             state = .failed(err.localizedDescription)
             teardown(reason: nil)
         case .cancelled:
-            if case .connected = state { /* already handled */ } else {
-                state = .disconnected
-            }
+            if case .connected = state { } else { state = .disconnected }
         default: break
         }
     }
@@ -107,13 +97,10 @@ final class QuicClient: ObservableObject {
     private func handleWelcome(_ welcome: Airpdf_V1_Welcome) {
         let sid = welcome.sessionID
         if let last = lastSessionId, last != sid {
-            // New session — discard all cached document state (Phase 2 will act on this)
             logger.info("New session (was \(last)), discarding cached state")
         }
         lastSessionId = sid
         state = .connected(sessionId: sid)
-        stopTimeoutTimer()
-        startHeartbeat()
         logger.info("Connected, session=\(sid)")
     }
 
@@ -133,10 +120,7 @@ final class QuicClient: ObservableObject {
                     self.teardown(reason: error.localizedDescription)
                     return
                 }
-                if isComplete {
-                    self.teardown(reason: nil)
-                    return
-                }
+                if isComplete { self.teardown(reason: nil); return }
                 self.startReceiving()
             }
         }
@@ -150,71 +134,17 @@ final class QuicClient: ObservableObject {
 
     private func handle(_ envelope: Airpdf_V1_SyncEnvelope) {
         switch envelope.payload.body {
-        case .welcome(let w):
-            handleWelcome(w)
-        case .ping(let ping):
-            var pong = Airpdf_V1_Pong()
-            pong.sequence = ping.sequence
-            send(.wrap(.pong(pong)))
-        case .pong(let pong):
-            logger.debug("Pong seq=\(pong.sequence)")
-            resetTimeoutTimer()
+        case .welcome(let w): handleWelcome(w)
         case .error(let err):
             logger.error("Server error \(err.code.rawValue): \(err.message)")
-            if err.code == .unsupportedVersion {
-                teardown(reason: err.message)
-            }
-        default:
-            onMessage?(envelope)
+            if err.code == .unsupportedVersion { teardown(reason: err.message) }
+        default: onMessage?(envelope)
         }
-    }
-
-    // MARK: - Heartbeat
-
-    private func startHeartbeat() {
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + AirPDFConstants.heartbeatIntervalSeconds,
-                       repeating: AirPDFConstants.heartbeatIntervalSeconds)
-        timer.setEventHandler { [weak self] in
-            guard let self else { return }
-            self.pingSequence += 1
-            var ping = Airpdf_V1_Ping()
-            ping.sequence = self.pingSequence
-            Task { @MainActor in self.send(.wrap(.ping(ping))) }
-        }
-        timer.resume()
-        heartbeatTimer = timer
-        resetTimeoutTimer()
-    }
-
-    // MARK: - Timeout
-
-    private func startTimeoutTimer() { resetTimeoutTimer() }
-
-    private func resetTimeoutTimer() {
-        timeoutTimer?.cancel()
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + AirPDFConstants.sessionTimeoutSeconds)
-        timer.setEventHandler { [weak self] in
-            self?.logger.warning("Session timed out")
-            Task { @MainActor in self?.teardown(reason: "Session timed out") }
-        }
-        timer.resume()
-        timeoutTimer = timer
-    }
-
-    private func stopTimeoutTimer() {
-        timeoutTimer?.cancel()
-        timeoutTimer = nil
     }
 
     // MARK: - Teardown
 
     private func teardown(reason: String?) {
-        heartbeatTimer?.cancel()
-        heartbeatTimer = nil
-        timeoutTimer?.cancel()
-        timeoutTimer = nil
         connection?.cancel()
         connection = nil
         receiveBuffer = Data()

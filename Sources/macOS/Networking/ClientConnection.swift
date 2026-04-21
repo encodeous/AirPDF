@@ -3,8 +3,8 @@ import Foundation
 import Network
 import os
 
-/// Represents one connected iPad client. Handles the Hello/Welcome handshake,
-/// heartbeat ping/pong, 1-minute session timeout, and message framing.
+/// Represents one connected iPad client. Handles the Hello/Welcome handshake
+/// and message framing. Liveness is handled by QUIC transport-level keepalive.
 final class ClientConnection: @unchecked Sendable {
     let connection: NWConnection
     private let queue: DispatchQueue
@@ -16,9 +16,6 @@ final class ClientConnection: @unchecked Sendable {
 
     private(set) var sessionId: String?
     private var receiveBuffer = Data()
-    private var heartbeatTimer: DispatchSourceTimer?
-    private var timeoutTimer: DispatchSourceTimer?
-    private var pingSequence: UInt64 = 0
 
     init(connection: NWConnection, queue: DispatchQueue) {
         self.connection = connection
@@ -33,7 +30,6 @@ final class ClientConnection: @unchecked Sendable {
                 case .ready:
                     self.logger.info("Client connection ready, awaiting Hello")
                     self.startReceiving()
-                    self.startTimeoutTimer()
                 case .failed(let err):
                     self.logger.error("Client connection failed: \(err)")
                     self.teardown()
@@ -96,13 +92,8 @@ final class ClientConnection: @unchecked Sendable {
         switch envelope.payload.body {
         case .hello(let hello):
             handleHello(hello)
-        case .pong(let pong):
-            handlePong(pong)
         default:
-            // Forward to app layer only after handshake
-            if sessionId != nil {
-                onMessage?(envelope)
-            }
+            if sessionId != nil { onMessage?(envelope) }
         }
     }
 
@@ -112,84 +103,23 @@ final class ClientConnection: @unchecked Sendable {
             cancel()
             return
         }
-
-        let newSessionId = hello.resumeSessionID.isEmpty ? UUID().uuidString : hello.resumeSessionID
-        sessionId = newSessionId
+        let sid = hello.resumeSessionID.isEmpty ? UUID().uuidString : hello.resumeSessionID
+        sessionId = sid
 
         var welcome = Airpdf_V1_Welcome()
         welcome.protocolVersion = AirPDFConstants.protocolVersion
-        welcome.sessionID = newSessionId
+        welcome.sessionID = sid
         send(.wrap(.welcome(welcome)))
 
-        stopTimeoutTimer()
-        startHeartbeat()
-
-        logger.info("Session established: \(newSessionId)")
-        let sid = newSessionId
-        DispatchQueue.main.async { [weak self] in
-            self?.onSessionEstablished?(sid)
-        }
-    }
-
-    private func handlePong(_ pong: Airpdf_V1_Pong) {
-        logger.debug("Pong received seq=\(pong.sequence)")
-        // Reset the timeout window on any pong
-        resetTimeoutTimer()
-    }
-
-    // MARK: - Heartbeat
-
-    private func startHeartbeat() {
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + AirPDFConstants.heartbeatIntervalSeconds,
-                       repeating: AirPDFConstants.heartbeatIntervalSeconds)
-        timer.setEventHandler { [weak self] in self?.sendPing() }
-        timer.resume()
-        heartbeatTimer = timer
-        resetTimeoutTimer()
-    }
-
-    private func sendPing() {
-        pingSequence += 1
-        var ping = Airpdf_V1_Ping()
-        ping.sequence = pingSequence
-        send(.wrap(.ping(ping)))
-    }
-
-    // MARK: - Timeout
-
-    private func startTimeoutTimer() {
-        resetTimeoutTimer()
-    }
-
-    private func resetTimeoutTimer() {
-        timeoutTimer?.cancel()
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + AirPDFConstants.sessionTimeoutSeconds)
-        timer.setEventHandler { [weak self] in
-            self?.logger.warning("Session timed out")
-            self?.teardown()
-        }
-        timer.resume()
-        timeoutTimer = timer
-    }
-
-    private func stopTimeoutTimer() {
-        timeoutTimer?.cancel()
-        timeoutTimer = nil
+        logger.info("Session established: \(sid)")
+        DispatchQueue.main.async { [weak self] in self?.onSessionEstablished?(sid) }
     }
 
     // MARK: - Teardown
 
     private func teardown() {
-        heartbeatTimer?.cancel()
-        heartbeatTimer = nil
-        timeoutTimer?.cancel()
-        timeoutTimer = nil
         connection.cancel()
-        DispatchQueue.main.async { [weak self] in
-            self?.onDisconnect?()
-        }
+        DispatchQueue.main.async { [weak self] in self?.onDisconnect?() }
     }
 }
 #endif

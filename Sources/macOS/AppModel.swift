@@ -99,10 +99,6 @@ final class AppModel: ObservableObject {
     private func handleMessage(_ envelope: Airpdf_V1_SyncEnvelope) {
         // Phase 2+ will handle StrokeBatch, Undo, Redo, etc.
         switch envelope.payload.body {
-        case .ping(let ping):
-            var pong = Airpdf_V1_Pong()
-            pong.sequence = ping.sequence
-            activeClient?.send(.wrap(.pong(pong)))
         default:
             break
         }

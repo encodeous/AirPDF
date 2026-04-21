@@ -28,19 +28,19 @@ final class QuicServer: ObservableObject {
     func start() throws {
         guard state == .stopped else { return }
 
-        let tlsOptions = NWProtocolTLS.Options()
         let identity = try TLSIdentity.selfSigned()
-        sec_protocol_options_set_local_identity(
-            tlsOptions.securityProtocolOptions,
-            identity.secIdentity
-        )
-        sec_protocol_options_set_min_tls_protocol_version(
-            tlsOptions.securityProtocolOptions,
-            .TLSv12
-        )
 
         let quicOptions = NWProtocolQUIC.Options(alpn: ["airpdf"])
         quicOptions.direction = .bidirectional
+        sec_protocol_options_set_local_identity(
+            quicOptions.securityProtocolOptions,
+            identity.secIdentity
+        )
+        sec_protocol_options_set_min_tls_protocol_version(
+            quicOptions.securityProtocolOptions,
+            .TLSv12
+        )
+        print("[QuicServer] TLS identity set on QUIC options")
 
         let params = NWParameters(quic: quicOptions)
         params.allowLocalEndpointReuse = true
@@ -82,27 +82,30 @@ final class QuicServer: ObservableObject {
     // MARK: - Incoming connection
 
     private func handleIncoming(_ conn: NWConnection) {
-        if activeClient != nil {
-            // Single-client enforcement: reject immediately
-            let client = ClientConnection(connection: conn, queue: queue)
-            client.sendError(.clientAlreadyConnected, message: "A client is already connected.")
-            client.cancel()
-            logger.warning("Rejected second client connection")
-            return
-        }
         let client = ClientConnection(connection: conn, queue: queue)
-        activeClient = client
-        client.onDisconnect = { [weak self] in
+        client.onDisconnect = { [weak self, weak client] in
             Task { @MainActor in
-                self?.activeClient = nil
-                self?.state = .running(port: AirPDFConstants.serverPort)
-                self?.onClientDisconnected?()
+                guard let self, let client else { return }
+                if self.activeClient === client {
+                    self.activeClient = nil
+                    self.state = .running(port: AirPDFConstants.serverPort)
+                    self.onClientDisconnected?()
+                }
             }
         }
         client.onSessionEstablished = { [weak self] sessionId in
             Task { @MainActor in
-                self?.state = .clientConnected(sessionId: sessionId)
-                self?.onClientConnected?(client)
+                guard let self else { return }
+                if self.activeClient != nil {
+                    // Another connection won the race — reject this one
+                    client.sendError(.clientAlreadyConnected, message: "A client is already connected.")
+                    client.cancel()
+                    self.logger.warning("Rejected second client connection (post-handshake)")
+                    return
+                }
+                self.activeClient = client
+                self.state = .clientConnected(sessionId: sessionId)
+                self.onClientConnected?(client)
             }
         }
         client.start()
