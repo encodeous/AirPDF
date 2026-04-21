@@ -94,6 +94,36 @@ Key implementation details:
 - No PDF size limit.
 - In-session PKDrawing fidelity is perfect; fidelity loss only occurs if the `airpdf_drawing.pkdata` attachment is stripped by a third-party editor.
 
+## Test Workflow
+
+Prefer Xcode MCP over raw shell commands for build/test feedback.
+
+- Use `BuildProject` first to catch compile errors quickly.
+- Use `XcodeRefreshCodeIssuesInFile` for focused diagnostics after touching a file.
+- Use `GetTestList` to discover valid XCTest identifiers before running a subset.
+- Use `RunSomeTests` for the normal fast path. It respects Xcode's active scheme, active test plan, and current destination.
+- For this repo, the default verification target is `AirPDFTests` rather than `RunAllTests`.
+
+Recommended unit-test flow:
+
+1. `BuildProject`
+2. `GetTestList`
+3. `RunSomeTests` with only the relevant `AirPDFTests` identifiers
+4. If the change is broad, run the full `AirPDFTests` set with `RunSomeTests`
+
+Current useful test identifiers include:
+
+- `StrokeModelTests/testRemoveStrokeThenUndo()`
+- `StrokeModelTests/testGroupedRemoveAndAddUndoRedo()`
+- `StrokeModelTests/testMacUndoRedoScenario()`
+
+Important caveat:
+
+- `RunAllTests` also includes `AirPDFUITests`.
+- If UI test signing is not configured, macOS may show `AirPDFUITests-Runner.app is damaged and can’t be opened`.
+- That dialog is from the unsigned UI test runner, not from the main AirPDF app.
+- In that case, stay on `RunSomeTests` and run only the `AirPDFTests` target until UI test signing is fixed.
+
 ## Open Questions
 
 _None currently._

@@ -85,8 +85,8 @@ final class StrokeModelTests: XCTestCase {
         model.addStrokes([e1, e2])
         model.removeStrokes(ids: [e1.id, e2.id])
         XCTAssertEqual(model.strokeLog.count, 0)
-        XCTAssertEqual(model.undoIndex, 0)
-        XCTAssertFalse(model.canUndo)
+        XCTAssertEqual(model.undoIndex, 3)
+        XCTAssertTrue(model.canUndo)
     }
 
     func testRemoveNonexistentStroke() {
@@ -198,8 +198,9 @@ final class StrokeModelTests: XCTestCase {
         let e3 = makeEntry(page: 1)
         model.replaceAll(with: [e3])
         XCTAssertEqual(model.strokeLog.count, 1)
-        XCTAssertEqual(model.undoIndex, 1)
+        XCTAssertEqual(model.undoIndex, 0)
         XCTAssertEqual(model.strokeLog[0].id, e3.id)
+        XCTAssertFalse(model.canUndo)
         XCTAssertFalse(model.canRedo)
         XCTAssertFalse(model.hasUnsavedChanges)
     }
@@ -316,7 +317,8 @@ final class StrokeModelTests: XCTestCase {
         model.loadFromDisk(pdfDocument: pdfDoc)
 
         XCTAssertEqual(model.strokeLog.count, 2)
-        XCTAssertEqual(model.undoIndex, 2)
+        XCTAssertEqual(model.undoIndex, 0)
+        XCTAssertFalse(model.canUndo)
         XCTAssertEqual(model.strokeLog[0].id, id1)
         XCTAssertEqual(model.strokeLog[1].id, id2)
         XCTAssertEqual(page.annotations.count, 0) // stripped
@@ -408,7 +410,26 @@ final class StrokeModelTests: XCTestCase {
         model.addStrokes([e1, e2])
         model.removeStrokes(ids: [e1.id])
         let undone = model.undo()
-        XCTAssertEqual(undone?.id, e2.id)
-        XCTAssertEqual(model.activeStrokes(forPage: 0).count, 0)
+        XCTAssertEqual(undone?.id, e1.id)
+        XCTAssertEqual(model.activeStrokes(forPage: 0).count, 2)
+    }
+
+    func testGroupedRemoveAndAddUndoRedo() {
+        let model = StrokeModel()
+        let original = makeEntry()
+        model.replaceAll(with: [original])
+
+        let moved = makeEntry()
+        model.removeStrokes(ids: [original.id], changeID: "lasso")
+        model.addStrokes([moved], changeID: "lasso")
+
+        XCTAssertEqual(model.undoIndex, 1)
+        XCTAssertEqual(model.activeStrokes(forPage: 0).map(\.id), [moved.id])
+
+        _ = model.undo()
+        XCTAssertEqual(model.activeStrokes(forPage: 0).map(\.id), [original.id])
+
+        _ = model.redo()
+        XCTAssertEqual(model.activeStrokes(forPage: 0).map(\.id), [moved.id])
     }
 }

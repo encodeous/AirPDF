@@ -128,7 +128,7 @@ final class AppModel: ObservableObject {
                       let stroke = drawing.strokes.first else { return nil }
                 return (id: uuid, page: pageIdx, stroke: stroke)
             }
-            session.model.addStrokes(entries)
+            session.model.addStrokes(entries, changeID: msg.changeID.isEmpty ? nil : msg.changeID)
             for e in entries {
                 session.overlayCoordinator?.addStrokeAnnotation(page: e.page, id: e.id.uuidString, stroke: e.stroke)
             }
@@ -138,7 +138,10 @@ final class AppModel: ObservableObject {
             guard let session = store.sessions.first(where: { $0.documentId == msg.documentID }) else { return }
             let pageIdx = Int(msg.pageIndex)
             let removeSet = Set(msg.strokeIds)
-            session.model.removeStrokes(ids: Set(removeSet.compactMap { UUID(uuidString: $0) }))
+            session.model.removeStrokes(
+                ids: Set(removeSet.compactMap { UUID(uuidString: $0) }),
+                changeID: msg.changeID.isEmpty ? nil : msg.changeID
+            )
             session.overlayCoordinator?.removeStrokeAnnotations(page: pageIdx, ids: removeSet)
             objectWillChange.send()
 
@@ -155,14 +158,14 @@ final class AppModel: ObservableObject {
     }
 
     func handleUndo(session: DocumentSession) {
-        guard let entry = session.model.undo() else { return }
-        session.overlayCoordinator?.removeStrokeAnnotations(page: entry.page, ids: [entry.id.uuidString])
+        guard session.model.undo() != nil else { return }
+        session.overlayCoordinator?.rebuildAnnotations()
         activeClient?.send(.wrap(.drawingsUpdate(makeDrawingsUpdate(for: session))))
     }
 
     func handleRedo(session: DocumentSession) {
-        guard let entry = session.model.redo() else { return }
-        session.overlayCoordinator?.addStrokeAnnotation(page: entry.page, id: entry.id.uuidString, stroke: entry.stroke)
+        guard session.model.redo() != nil else { return }
+        session.overlayCoordinator?.rebuildAnnotations()
         activeClient?.send(.wrap(.drawingsUpdate(makeDrawingsUpdate(for: session))))
     }
 

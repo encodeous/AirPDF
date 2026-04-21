@@ -30,25 +30,60 @@ private struct ClientStateView: View {
                     Button("Cancel") { vm.disconnect() }
                         .buttonStyle(.bordered)
                 }
-            case .connected:
-                PDFTabView(store: vm.documentStore, onStrokeDelta: { vm.send($0) },
-                           onVCReady: { [weak vm] vc in vm?.activeDrawingVC = vc })
-                    .navigationTitle("")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Label("Mac: \(client.sessionFingerprint)", systemImage: "desktopcomputer")
-                                Label("iPad: \(client.ownFingerprint)", systemImage: "ipad")
-                            }
-                            .font(.caption2).monospaced().foregroundStyle(.secondary)
-                        }
-                        ToolbarItemGroup(placement: .topBarTrailing) {
-                            Button("Disconnect", role: .destructive) { vm.disconnect() }
-                        }
-                    }
+            case .connected(let sessionId):
+                ConnectedSessionView(client: client, vm: vm, sessionId: sessionId)
             }
         }
+    }
+}
+
+private struct ConnectedSessionView: View {
+    @ObservedObject var client: QuicClient
+    let vm: ConnectionViewModel
+    let sessionId: String
+
+    @State private var showConnectionInfo = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            PDFTabView(store: vm.documentStore, onStrokeDelta: { vm.send($0) },
+                       onVCReady: { [weak vm] vc in vm?.activeDrawingVC = vc })
+
+            Button { showConnectionInfo.toggle() } label: {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(12)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
+            .padding(.trailing, 16)
+            .popover(isPresented: $showConnectionInfo, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Mac connected").bold()
+                    Divider()
+                    Label("Mac: \(client.sessionFingerprint)", systemImage: "desktopcomputer")
+                        .font(.caption)
+                        .monospaced()
+                    Label("iPad: \(client.ownFingerprint)", systemImage: "ipad")
+                        .font(.caption)
+                        .monospaced()
+                    Text("Session: \(sessionId.prefix(8))…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Divider()
+                    Button("Disconnect", role: .destructive) {
+                        showConnectionInfo = false
+                        vm.disconnect()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 

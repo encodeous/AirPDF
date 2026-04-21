@@ -32,6 +32,38 @@ struct PDFCanvasView: UIViewControllerRepresentable {
 
 // MARK: - Drawing view controller
 
+private final class CanvasUndoShieldManager: UndoManager {
+    var logicalUndoManagerProvider: (() -> UndoManager?)?
+
+    private var logicalUndoManager: UndoManager? {
+        logicalUndoManagerProvider?()
+    }
+
+    override var canUndo: Bool { logicalUndoManager?.canUndo ?? false }
+    override var canRedo: Bool { logicalUndoManager?.canRedo ?? false }
+
+    override func registerUndo(withTarget target: Any, selector: Selector, object anObject: Any?) {}
+
+    override func undo() {
+        logicalUndoManager?.undo()
+    }
+
+    override func redo() {
+        logicalUndoManager?.redo()
+    }
+}
+
+private final class AirPDFCanvasView: PKCanvasView {
+    private let shieldedUndoManager = CanvasUndoShieldManager()
+
+    var logicalUndoManagerProvider: (() -> UndoManager?)? {
+        get { shieldedUndoManager.logicalUndoManagerProvider }
+        set { shieldedUndoManager.logicalUndoManagerProvider = newValue }
+    }
+
+    override var undoManager: UndoManager? { shieldedUndoManager }
+}
+
 final class DrawingViewController: UIViewController {
     var onStrokeDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
     private(set) var currentDocId: String?
@@ -51,13 +83,15 @@ final class DrawingViewController: UIViewController {
     }()
     let overlayCoordinator = OverlayCoordinator()
     private var pendingDoc: TabDocument?
+    private let logicalUndoManager = UndoManager()
 
     override var canBecomeFirstResponder: Bool { true }
+    override var undoManager: UndoManager? { logicalUndoManager }
 
     /// Register one undo action on the VC's undoManager.
     /// Undo sends Undo to Mac, registers a redo.
     /// Redo sends Redo to Mac, re-registers an undo (so the cycle continues).
-    func registerUndoAction() {
+    func registerLogicalUndoAction() {
         undoManager?.registerUndo(withTarget: self) { vc in
             vc.onStrokeDelta?(.wrap(.undo({
                 var m = Airpdf_V1_Undo()
@@ -70,7 +104,7 @@ final class DrawingViewController: UIViewController {
                     m.documentID = vc2.overlayCoordinator.docId
                     return m
                 }())))
-                vc2.registerUndoAction()
+                vc2.registerLogicalUndoAction()
             }
         }
     }
@@ -102,7 +136,7 @@ final class DrawingViewController: UIViewController {
 
     func loadDocument(_ doc: TabDocument) {
         overlayCoordinator.reset()
-        undoManager?.removeAllActions(withTarget: self)
+        undoManager?.removeAllActions()
         currentDocId = doc.id
         guard isViewLoaded else { pendingDoc = doc; return }
         applyDocument(doc)
@@ -120,7 +154,11 @@ final class DrawingViewController: UIViewController {
             onStrokeDelta: { [weak self] env in self?.onStrokeDelta?(env) }
         )
         overlayCoordinator.onNeedsFirstResponder = { [weak self] in self?.becomeFirstResponder() }
-        overlayCoordinator.onStrokeCommitted = { [weak self] in self?.registerUndoAction() }
+        overlayCoordinator.logicalUndoManagerProvider = { [weak self] in self?.logicalUndoManager }
+        overlayCoordinator.onOperationCommitted = { [weak self] in
+            self?.registerLogicalUndoAction()
+            self?.becomeFirstResponder()
+        }
         pdfView.document = PDFDocument(data: doc.pdfData)
         becomeFirstResponder()
         logger.info("applyDocument: \(doc.id), \(doc.pageCount) pages")
@@ -154,8 +192,9 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
     private weak var toolPicker: PKToolPicker?
     private weak var pdfViewRef: PDFView?
     private var onStrokeDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
+    var logicalUndoManagerProvider: (() -> UndoManager?)?
     var onNeedsFirstResponder: (() -> Void)?
-    var onStrokeCommitted: (() -> Void)?
+    var onOperationCommitted: (() -> Void)?
     var activeCanvases: [PKCanvasView] { Array(pageToViewMapping.values) }
 
     func configure(docId: String, initialStrokes: [(id: UUID, page: Int, stroke: PKStroke)],
@@ -178,19 +217,19 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
 
     // MARK: - Stroke commit (from StrokeDiffer after pen lift)
 
-    func commitNewStrokes(pageIndex: Int, newStrokes: [(id: UUID, stroke: PKStroke)]) {
+    func commitNewStrokes(pageIndex: Int, newStrokes: [(id: UUID, stroke: PKStroke)], changeID: String?) {
+        guard !newStrokes.isEmpty else { return }
+        model.addStrokes(newStrokes.map { (id: $0.id, page: pageIndex, stroke: $0.stroke) }, changeID: changeID)
         guard !isEditMode else { return }
-        model.addStrokes(newStrokes.map { (id: $0.id, page: pageIndex, stroke: $0.stroke) })
         if let layer = annotationLayer(for: pageIndex) {
             for (id, stroke) in newStrokes { layer.addStroke(id: id.uuidString, stroke: stroke) }
         }
         differs[pageIndex]?.clearKnown()
         clearCanvas(pageIndex: pageIndex)
-        onStrokeCommitted?()
     }
 
-    func handleStrokesRemoved(pageIndex: Int, ids: Set<UUID>) {
-        model.removeStrokes(ids: ids)
+    func handleStrokesRemoved(pageIndex: Int, ids: Set<UUID>, changeID: String?) {
+        model.removeStrokes(ids: ids, changeID: changeID)
         if !isEditMode {
             annotationLayers[pageIndex]?.removeStrokes(ids: Set(ids.map { $0.uuidString }))
         }
@@ -200,7 +239,11 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
 
     func applySnapshot(_ strokes: [(id: UUID, page: Int, stroke: PKStroke)]) {
         model.replaceAll(with: strokes)
-        rebuildAllAnnotations()
+        if isEditMode {
+            rebuildEditModeCanvases()
+        } else {
+            rebuildAllAnnotations()
+        }
     }
 
     private func rebuildAllAnnotations() {
@@ -230,6 +273,19 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
             doc.removePage(at: idx); doc.insert(page, at: idx)
         }
         if let savedOffset { scrollView?.contentOffset = savedOffset }
+        onNeedsFirstResponder?()
+    }
+
+    private func rebuildEditModeCanvases() {
+        for layer in annotationLayers.values { layer.removeAll() }
+        pendingEditSetup = [:]
+
+        for (page, canvas) in pageToViewMapping {
+            guard let doc = page.document else { continue }
+            let idx = doc.index(for: page)
+            rehydrateEditCanvas(canvas, pageIndex: idx, strokes: model.activeStrokes(forPage: idx))
+        }
+
         onNeedsFirstResponder?()
     }
 
@@ -285,6 +341,20 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
         }
     }
 
+    private func rehydrateEditCanvas(_ canvas: PKCanvasView, pageIndex: Int, strokes: [(id: UUID, stroke: PKStroke)]) {
+        guard let differ = differs[pageIndex] else { return }
+        canvas.delegate = nil
+        canvas.drawing = PKDrawing(strokes: strokes.map(\.stroke))
+        let canvasStrokes = canvas.drawing.strokes
+        if canvasStrokes.count == strokes.count {
+            let paired = zip(strokes, canvasStrokes).map { ($0.0.id, $0.1) }
+            differ.restoreKnown(paired)
+        } else {
+            differ.restoreKnown(strokes)
+        }
+        canvas.delegate = differ
+    }
+
     // MARK: - Helpers
 
     private func pdfPage(for pageIndex: Int) -> PDFPage? {
@@ -312,11 +382,12 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
             return existing
         }
 
-        let canvas = PKCanvasView(frame: .zero)
+        let canvas = AirPDFCanvasView(frame: .zero)
         canvas.drawingPolicy = .pencilOnly
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
         canvas.overrideUserInterfaceStyle = .light
+        canvas.logicalUndoManagerProvider = logicalUndoManagerProvider
         if let tool = toolPicker?.selectedTool { canvas.tool = tool }
 
         let differ: StrokeDiffer
@@ -327,8 +398,13 @@ final class OverlayCoordinator: NSObject, PDFPageOverlayViewProvider {
             differ.onDelta = { [weak self] env in self?.onStrokeDelta?(env) }
             differs[idx] = differ
         }
-        differ.onStrokesAdded = { [weak self] pi, ns in self?.commitNewStrokes(pageIndex: pi, newStrokes: ns) }
-        differ.onStrokesRemoved = { [weak self] pi, ids in self?.handleStrokesRemoved(pageIndex: pi, ids: ids) }
+        differ.onStrokesAdded = { [weak self] pi, ns, changeID in
+            self?.commitNewStrokes(pageIndex: pi, newStrokes: ns, changeID: changeID)
+        }
+        differ.onStrokesRemoved = { [weak self] pi, ids, changeID in
+            self?.handleStrokesRemoved(pageIndex: pi, ids: ids, changeID: changeID)
+        }
+        differ.onOperationCommitted = { [weak self] _ in self?.onOperationCommitted?() }
 
         if let editStrokes = pendingEditSetup.removeValue(forKey: idx) {
             // Edit mode: put strokes on canvas for PencilKit tools to operate on
@@ -392,8 +468,9 @@ final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
     let pageIndex: Int
     let documentId: String
     var onDelta: ((Airpdf_V1_SyncEnvelope) -> Void)?
-    var onStrokesAdded: ((_ pageIndex: Int, _ newStrokes: [(id: UUID, stroke: PKStroke)]) -> Void)?
-    var onStrokesRemoved: ((_ pageIndex: Int, _ removedIds: Set<UUID>) -> Void)?
+    var onStrokesAdded: ((_ pageIndex: Int, _ newStrokes: [(id: UUID, stroke: PKStroke)], _ changeID: String?) -> Void)?
+    var onStrokesRemoved: ((_ pageIndex: Int, _ removedIds: Set<UUID>, _ changeID: String?) -> Void)?
+    var onOperationCommitted: ((_ changeID: String) -> Void)?
 
     /// randomSeed → (UUID, PKStroke) mapping. Source of truth for stroke identity.
     private var known: [UInt32: (id: UUID, stroke: PKStroke)] = [:]
@@ -415,11 +492,19 @@ final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         let current = canvasView.drawing.strokes
+        let currentBySeed = Dictionary(uniqueKeysWithValues: current.map { ($0.randomSeed, $0) })
         let currentSeeds = Set(current.map { $0.randomSeed })
         let knownSeeds = Set(known.keys)
+        let modifiedSeeds = currentSeeds.intersection(knownSeeds).filter { seed in
+            guard let knownStroke = known[seed]?.stroke,
+                  let currentStroke = currentBySeed[seed] else { return false }
+            return !strokesMatch(knownStroke, currentStroke)
+        }
+        let hasChanges = currentSeeds != knownSeeds || !modifiedSeeds.isEmpty
+        let changeID = hasChanges ? UUID().uuidString : nil
 
-        // Removed strokes: in known but not in current
-        let removedSeeds = knownSeeds.subtracting(currentSeeds)
+        // Removed or modified strokes: remove old identity first.
+        let removedSeeds = knownSeeds.subtracting(currentSeeds).union(modifiedSeeds)
         if !removedSeeds.isEmpty {
             var removedIds: [UUID] = []
             var removedIdStrings: [String] = []
@@ -432,12 +517,13 @@ final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
             var rm = Airpdf_V1_StrokeRemove()
             rm.documentID = documentId; rm.pageIndex = UInt32(pageIndex)
             rm.strokeIds = removedIdStrings
+            if let changeID { rm.changeID = changeID }
             onDelta?(.wrap(.strokeRemove(rm)))
-            onStrokesRemoved?(pageIndex, Set(removedIds))
+            onStrokesRemoved?(pageIndex, Set(removedIds), changeID)
         }
 
-        // New strokes: in current but not in known
-        let newSeeds = currentSeeds.subtracting(knownSeeds)
+        // New or modified strokes: add current geometry back with fresh IDs.
+        let newSeeds = currentSeeds.subtracting(knownSeeds).union(modifiedSeeds)
         if !newSeeds.isEmpty {
             var batch = Airpdf_V1_StrokeBatch()
             batch.documentID = documentId; batch.pageIndex = UInt32(pageIndex)
@@ -448,12 +534,23 @@ final class StrokeDiffer: NSObject, PKCanvasViewDelegate {
                 newStrokes.append((id: uuid, stroke: stroke))
                 var entry = Airpdf_V1_StrokeEntry()
                 entry.strokeID = uuid.uuidString
-                entry.pkStrokeData = (try? PKDrawing(strokes: [stroke]).dataRepresentation()) ?? Data()
+                entry.pkStrokeData = PKDrawing(strokes: [stroke]).dataRepresentation()
                 batch.strokes.append(entry)
             }
+            if let changeID { batch.changeID = changeID }
             onDelta?(.wrap(.strokeBatch(batch)))
-            onStrokesAdded?(pageIndex, newStrokes)
+            onStrokesAdded?(pageIndex, newStrokes, changeID)
         }
+
+        if let changeID {
+            onOperationCommitted?(changeID)
+        }
+    }
+
+    private func strokesMatch(_ lhs: PKStroke, _ rhs: PKStroke) -> Bool {
+        let lhsData = PKDrawing(strokes: [lhs]).dataRepresentation()
+        let rhsData = PKDrawing(strokes: [rhs]).dataRepresentation()
+        return lhsData == rhsData
     }
 }
 #endif

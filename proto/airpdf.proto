@@ -144,6 +144,8 @@ message StrokeBatch {
   uint32 page_index = 2;
   // One or more new strokes.
   repeated StrokeEntry strokes = 3;
+  // Optional logical operation ID used to group edit-mode remove+add pairs.
+  string change_id = 4;
 }
 
 // A single finalized stroke.
@@ -170,6 +172,8 @@ message StrokeRemove {
   uint32 page_index = 2;
   // The stroke_ids to remove.
   repeated string stroke_ids = 4;
+  // Optional logical operation ID used to group edit-mode remove+add pairs.
+  string change_id = 5;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
